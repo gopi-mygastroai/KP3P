@@ -1,6 +1,0 @@
-{
-  "buildCommand": "cd admin && npx prisma generate && next build",
-  "installCommand": "cd admin && npm install --legacy-peer-deps",
-  "outputDirectory": "admin/.next",
-  "framework": "nextjs"
-}
