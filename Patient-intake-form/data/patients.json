@@ -1,0 +1,96 @@
+[
+  {
+    "email": "arjun@gmail.com",
+    "name": "Arjun",
+    "mrn": "12334",
+    "dateOfBirth": "2002-05-23",
+    "currentAge": "22",
+    "ageAtDiagnosis": "22",
+    "sex": "Male",
+    "smokingStatus": "Current smoker",
+    "smokingDetails": "1 Packet - Daliy",
+    "contactPhone": "999999999",
+    "placeOfLiving": "Hyderabad",
+    "referredBy": "Kiran",
+    "primaryDiagnosis": "Ulcerative Colitis",
+    "montrealClass": "",
+    "diseaseDuration": "3–12 months",
+    "previousSurgeries": [
+      "Partial Colectomy",
+      "Ostomy creation"
+    ],
+    "perianalDiseaseAssessment": "",
+    "currentDiseaseActivity": "Severe",
+    "activityScore": "",
+    "stoolFrequency": "4–6 extra/day",
+    "bloodInStool": "Occasional",
+    "abdominalPain": "Mild",
+    "impactOnQoL": "Mild",
+    "weightLoss": "Yes",
+    "dateMostRecentLabs": "2026-04-23",
+    "currentIbdMedications": "",
+    "responseToTreatment": "Secondary loss",
+    "tdmResults": "",
+    "steroidUse": ">3 months",
+    "currentSupplements": "",
+    "previousTreatmentsTried": [
+      "5-ASA (mesalamine, sulfasalazine)",
+      "Corticosteroids (prednisone, budesonide)"
+    ],
+    "failedTreatments": "",
+    "tbScreening": "Done – Negative (IGRA or TST)",
+    "hepBSurfaceAg": "Negative",
+    "hepBSurfaceAb": "Negative (Not immune)",
+    "hepBCoreAb": "Negative",
+    "antiHcv": "Negative",
+    "antiHiv": "Negative",
+    "influenza": {
+      "status": "unknown",
+      "doses": []
+    },
+    "covid19": {
+      "status": "unknown",
+      "doses": []
+    },
+    "pneumococcal": {
+      "status": "unknown",
+      "doses": []
+    },
+    "hepatitisB": {
+      "status": "unknown",
+      "doses": []
+    },
+    "hepatitisA": {
+      "status": "unknown",
+      "doses": []
+    },
+    "hepatitisE": {
+      "status": "unknown",
+      "doses": []
+    },
+    "zoster": {
+      "status": "unknown",
+      "doses": []
+    },
+    "mmrVaricella": {
+      "status": "unknown",
+      "doses": []
+    },
+    "tetanusTdap": {
+      "status": "unknown",
+      "doses": []
+    },
+    "comorbidities": [
+      "Type 2 Diabetes"
+    ],
+    "extraintestinalManif": [
+      "Uveitis / eye problems"
+    ],
+    "pregnancyPlanning": "Planning pregnancy within next year",
+    "occupation": "",
+    "specialConsiderations": "",
+    "preferredLanguage": "English",
+    "patientId": "PAT-1777448976238-440",
+    "submittedAt": "2026-04-29T07:49:36.238Z"
+  }
+]

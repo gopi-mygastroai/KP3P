@@ -1,0 +1,97 @@
+generator client {
+provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL")
+}
+
+
+model User {
+id        Int      @id @default(autoincrement())
+email     String   @unique
+name      String
+role      String   @default("PATIENT")
+password  String
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+
+patients  Patient[]
+}
+
+model Patient {
+id        Int      @id @default(autoincrement())
+userId    Int?
+user      User?    @relation(fields: [userId], references: [id])
+
+name             String
+email            String @default("")
+mrn              String
+contactPhone     String
+placeOfLiving    String
+referredBy       String
+dateOfBirth      String
+currentAge       Int
+ageAtDiagnosis   Int
+sex              String
+smokingStatus    String
+smokingDetails   String
+
+primaryDiagnosis  String
+diseaseDuration   String
+perianalDiseaseAssessment String @default("")
+montrealClass     String
+previousSurgeries String
+
+currentDiseaseActivity String
+stoolFrequency         String
+bloodInStool           String
+abdominalPain          String
+impactOnQoL            String
+weightLoss             String
+activityScore          String @default("")
+
+dateMostRecentLabs   String
+recentLabValues      String @default("")
+dateMostRecentColonoscopy String @default("")
+colonoscopyFindings  String @default("")
+recentImaging        String @default("")
+mostRecentDexaScan   String @default("")
+
+currentIbdMedications   String
+failedTreatments        String
+tdmResults              String
+currentSupplements      String
+responseToTreatment     String
+steroidUse              String
+previousTreatmentsTried String
+
+tbScreening      String
+hepBSurfaceAg    String
+hepBSurfaceAb    String
+hepBCoreAb       String
+antiHcv          String
+antiHiv          String
+
+influenza        String
+covid19          String
+pneumococcal     String
+hepatitisB       String
+hepatitisA       String
+hepatitisE       String
+zoster           String
+mmrVaricella     String
+tetanusTdap      String
+
+comorbidities         String
+extraintestinalManif  String
+pregnancyPlanning     String
+preferredLanguage     String
+occupation            String
+specialConsiderations String
+documents             String? @default("[]")
+
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+}

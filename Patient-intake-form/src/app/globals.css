@@ -1,0 +1,557 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ─── Design Tokens ─────────────────────────────────────── */
+:root {
+  --bg:              #f1f5f9;
+  --bg-card:         #ffffff;
+  --bg-input:        #f8fafc;
+  --bg-input-focus:  rgba(8,145,178,0.06);
+  --border:          #e2e8f0;
+  --border-focus:    #0891b2;
+  --primary:         #0891b2;
+  --primary-dim:     rgba(8,145,178,0.10);
+  --primary-glow:    rgba(8,145,178,0.25);
+  --success:         #16a34a;
+  --success-dim:     rgba(22,163,74,0.12);
+  --warning:         #d97706;
+  --warning-dim:     rgba(217,119,6,0.12);
+  --error:           #dc2626;
+  --error-bg:        rgba(220,38,38,0.06);
+  --text:            #0f172a;
+  --text-muted:      #64748b;
+  --text-dim:        #475569;
+  --radius:          10px;
+  --radius-sm:       6px;
+  --transition:      0.18s ease;
+}
+
+/* ─── Reset ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Page Shell ─────────────────────────────────────────── */
+.page-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f1f5f9;
+}
+
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: linear-gradient(135deg, #0891b2 0%, #a5f3fc 100%);
+  border-bottom: none;
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 12px rgba(8,145,178,0.2);
+}
+.header-brand { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
+.header-brand span { color: #fff; opacity: 0.85; }
+.header-tag {
+  font-size: 11px; color: #0c4a6e;
+  background: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.4);
+  padding: 3px 10px; border-radius: 20px; letter-spacing: 0.02em;
+}
+
+.page-main {
+  flex: 1;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+}
+
+/* ─── Progress Bar ──────────────────────────────────────── */
+.progress-wrap { margin-bottom: 28px; }
+.progress-label {
+  font-size: 12px; color: var(--text-muted);
+  margin-bottom: 10px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.progress-label strong { color: var(--text-dim); font-weight: 500; }
+.progress-track {
+  height: 4px; background: #e2e8f0;
+  border-radius: 99px; overflow: hidden; margin-bottom: 14px;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #3b82f6, #60a5fa);
+  border-radius: 99px;
+  transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 0 12px rgba(59,130,246,0.4);
+}
+
+/* ─── Step Dot Navigator ────────────────────────────────── */
+.progress-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 4px;
+  position: relative;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.progress-steps::-webkit-scrollbar { display: none; }
+
+.p-step-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  flex: 1;
+  min-width: 52px;
+  transition: opacity var(--transition);
+}
+.p-step-btn:disabled { cursor: default; opacity: 0.4; }
+.p-step-btn:not(:disabled):hover .p-dot { border-color: var(--primary); color: #fff; }
+
+.p-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  border: 2px solid #cbd5e1;
+  background: #fff; color: #94a3b8;
+  transition: all 0.22s ease;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.p-active .p-dot {
+  background: var(--primary); border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(8,145,178,0.15), 0 0 12px rgba(8,145,178,0.3);
+  transform: scale(1.15);
+}
+.p-done .p-dot {
+  background: var(--success); border-color: var(--success); color: #fff;
+}
+.p-label {
+  font-size: 9px; color: var(--text-muted);
+  white-space: nowrap; letter-spacing: 0.03em;
+  text-transform: uppercase; font-weight: 500;
+}
+.p-active .p-label { color: var(--primary); font-weight: 700; }
+.p-done .p-label   { color: var(--success); }
+
+/* ─── Step Card ─────────────────────────────────────────── */
+.step-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  animation: stepIn 0.28s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+}
+@keyframes stepIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.step-card-head {
+  padding: 22px 28px 18px;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(135deg, rgba(8,145,178,0.06) 0%, rgba(165,243,252,0.12) 100%);
+}
+.step-num {
+  font-size: 11px; font-weight: 700; color: var(--primary);
+  text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px;
+}
+.step-title { font-size: 19px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; }
+.step-subtitle { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; }
+
+.submit-err-banner {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--error-bg);
+  border: 1px solid rgba(248,113,113,0.25);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--error);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-body { padding: 24px 28px; }
+
+/* ─── Form Grid ─────────────────────────────────────────── */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; }
+.form-grid .span-2 { grid-column: 1 / -1; }
+.form-grid-1 { display: grid; grid-template-columns: 1fr; gap: 20px; }
+
+/* ─── Section Divider ───────────────────────────────────── */
+.section-divider { margin: 24px 0 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.section-divider:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.section-label {
+  font-size: 10.5px; font-weight: 700; color: var(--primary);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+}
+.section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ─── Form Group ────────────────────────────────────────── */
+.fg { display: flex; flex-direction: column; gap: 6px; }
+.fg label { font-size: 12.5px; font-weight: 500; color: var(--text-dim); }
+.fg label .req { color: var(--error); margin-left: 2px; }
+
+/* ─── Inputs ─────────────────────────────────────────────  */
+.fi {
+  width: 100%; padding: 10px 14px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text);
+  font-size: 14px; font-family: inherit;
+  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+  outline: none;
+}
+.fi::placeholder { color: var(--text-muted); font-size: 13px; }
+.fi:focus {
+  border-color: var(--border-focus);
+  background: var(--bg-input-focus);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+}
+.fi.err { border-color: var(--error); background: var(--error-bg); }
+textarea.fi { resize: vertical; min-height: 88px; line-height: 1.5; }
+select.fi {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px; cursor: pointer;
+}
+select.fi option { background: #ffffff; color: #0f172a; }
+input[type=file].fi-file-native {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+input[type=file].fi-file-native:focus {
+  border-color: var(--border-focus);
+  background: var(--bg-input-focus);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+  outline: none;
+}
+input[type=file].fi-file-native:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* ─── Error / Hint ──────────────────────────────────────── */
+.ferr { font-size: 11.5px; color: var(--error); display: flex; align-items: center; gap: 4px; }
+.ferr::before { content: '⚠'; font-size: 10px; }
+.field-hint { font-size: 11.5px; color: var(--text-muted); line-height: 1.4; }
+
+/* ─── Radio Group ───────────────────────────────────────── */
+.radio-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.radio-opt {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; background: var(--bg-input);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; transition: all var(--transition);
+  font-size: 13.5px; color: var(--text-dim); user-select: none;
+}
+.radio-opt:hover { border-color: rgba(59,130,246,0.4); background: var(--primary-dim); color: var(--text); }
+.radio-opt.selected { border-color: var(--primary); background: var(--primary-dim); color: #93c5fd; font-weight: 500; }
+.radio-opt input[type="radio"] { accent-color: var(--primary); width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ─── Checkbox Group ─────────────────────────────────────  */
+.check-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.check-opt {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; background: var(--bg-input);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; transition: all var(--transition);
+  font-size: 13.5px; color: var(--text-dim); user-select: none;
+}
+.check-opt:hover { border-color: rgba(59,130,246,0.4); background: var(--primary-dim); color: var(--text); }
+.check-opt.checked { border-color: var(--primary); background: var(--primary-dim); color: #93c5fd; font-weight: 500; }
+.check-opt input[type="checkbox"] { accent-color: var(--primary); width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ─── Conditional Field ─────────────────────────────────── */
+.conditional-field {
+  padding: 14px 16px;
+  background: rgba(59,130,246,0.04);
+  border: 1px solid rgba(59,130,246,0.15);
+  border-radius: var(--radius); margin-top: 4px;
+  animation: stepIn 0.2s ease;
+}
+
+/* ─── Navigation Buttons ────────────────────────────────── */
+.form-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 28px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  gap: 12px;
+}
+.form-nav-right { margin-left: auto; }
+
+.btn-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 20px;
+  background: #fff; border: 1px solid #cbd5e1;
+  border-radius: var(--radius-sm); color: #475569;
+  font-size: 14px; font-weight: 500; font-family: inherit;
+  cursor: pointer; transition: all var(--transition);
+  text-decoration: none;
+}
+.btn-back:hover { background: #f1f5f9; border-color: #94a3b8; color: #0f172a; }
+
+.btn-next {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 24px;
+  background: var(--primary); border: 1px solid rgba(8,145,178,0.4);
+  border-radius: var(--radius-sm); color: #fff;
+  font-size: 14px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: all var(--transition);
+  box-shadow: 0 4px 14px rgba(8,145,178,0.3);
+}
+.btn-next:hover:not(:disabled) { background: #0e7490; box-shadow: 0 6px 20px rgba(8,145,178,0.4); transform: translateY(-1px); }
+.btn-next:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.btn-submit {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 28px;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  border: none; border-radius: var(--radius-sm); color: #fff;
+  font-size: 14px; font-weight: 700; font-family: inherit;
+  cursor: pointer; transition: all var(--transition);
+  box-shadow: 0 4px 16px rgba(34,197,94,0.3);
+}
+.btn-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(34,197,94,0.45); }
+.btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ─── Mobile mini-map ───────────────────────────────────── */
+.step-minimap {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0 0;
+}
+.minimap-label { font-size: 12px; color: var(--text-muted); text-align: center; flex: 1; }
+.minimap-btn {
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  background: none; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 7px 14px;
+  color: var(--text-dim); cursor: pointer; transition: all var(--transition);
+}
+.minimap-btn-next {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+}
+
+/* ─── Vaccine Cards (Step 8) ─────────────────────────────  */
+.vax-list { display: flex; flex-direction: column; gap: 12px; }
+
+.vax-card {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.vax-card:hover { border-color: rgba(59,130,246,0.22); }
+.vax-card-err {
+  border-color: var(--error) !important;
+  box-shadow: 0 0 0 2px rgba(248,113,113,0.12);
+}
+.vax-card-given   { border-color: rgba(34,197,94,0.3); }
+.vax-card-never   { border-color: rgba(248,113,113,0.22); }
+.vax-card-unknown { border-color: rgba(251,191,36,0.22); }
+
+.vax-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.vax-info { display: flex; align-items: flex-start; gap: 12px; flex: 1; min-width: 180px; }
+.vax-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.vax-label { font-size: 14px; font-weight: 600; color: var(--text); }
+.vax-sublabel { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+
+.vax-status-row { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+
+.vax-status-btn {
+  padding: 7px 13px; border-radius: var(--radius-sm);
+  font-size: 12.5px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: all 0.15s ease;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.vax-status-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+.vax-given.active   { background: var(--success-dim); border-color: var(--success); color: #4ade80; }
+.vax-never.active   { background: var(--error-bg); border-color: var(--error); color: #fca5a5; }
+.vax-unknown.active { background: var(--warning-dim); border-color: var(--warning); color: #fcd34d; }
+
+.vax-error-strip {
+  padding: 8px 16px; font-size: 12px; color: var(--error);
+  background: var(--error-bg);
+  display: flex; align-items: center; gap: 6px;
+  border-top: 1px solid rgba(248,113,113,0.15);
+}
+
+.vax-doses-panel {
+  border-top: 1px solid var(--border);
+  padding: 14px 16px;
+  background: rgba(59,130,246,0.03);
+  animation: stepIn 0.2s ease;
+}
+
+.vax-doses-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.vax-doses-title {
+  font-size: 11px; font-weight: 700; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.09em;
+  display: flex; align-items: center; gap: 8px;
+}
+.vax-typical-badge {
+  font-size: 10px; font-weight: 500; color: var(--primary);
+  background: var(--primary-dim); padding: 2px 8px;
+  border-radius: 99px; letter-spacing: 0;
+  text-transform: none;
+}
+.vax-add-dose-btn {
+  padding: 6px 14px;
+  background: rgba(59,130,246,0.1);
+  border: 1px solid rgba(59,130,246,0.28);
+  border-radius: var(--radius-sm); color: var(--primary);
+  font-size: 12.5px; font-weight: 700; font-family: inherit;
+  cursor: pointer; transition: all var(--transition);
+}
+.vax-add-dose-btn:hover { background: rgba(59,130,246,0.2); border-color: var(--primary); }
+
+.vax-empty-doses {
+  font-size: 13px; color: var(--text-muted);
+  text-align: center; padding: 18px 12px;
+  border: 1px dashed rgba(255,255,255,0.08);
+  border-radius: var(--radius-sm);
+}
+
+.vax-dose-list { display: flex; flex-direction: column; gap: 10px; }
+
+.vax-dose-row {
+  display: flex; align-items: flex-end; gap: 10px;
+  padding: 12px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.vax-dose-badge {
+  font-size: 10px; font-weight: 800; color: var(--primary);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  min-width: 44px; padding-bottom: 10px;
+}
+.vax-dose-inputs { display: flex; gap: 10px; flex: 1; flex-wrap: wrap; }
+.vax-dose-inputs .fg { flex: 1; min-width: 130px; }
+
+.vax-remove-dose-btn {
+  padding: 8px 11px; flex-shrink: 0;
+  background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.2);
+  border-radius: var(--radius-sm); color: var(--error);
+  font-size: 12px; cursor: pointer; transition: all var(--transition);
+  margin-bottom: 0;
+}
+.vax-remove-dose-btn:hover { background: rgba(248,113,113,0.18); border-color: var(--error); }
+
+.vax-status-note {
+  padding: 10px 16px; font-size: 12.5px;
+  border-top: 1px solid var(--border);
+  animation: stepIn 0.2s ease;
+}
+.vax-note-never   { color: #fca5a5; background: rgba(248,113,113,0.05); }
+.vax-note-unknown { color: #fcd34d; background: rgba(251,191,36,0.05); }
+
+/* ─── Responsive ────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .progress-steps { gap: 2px; }
+  .p-label { display: none; }
+  .p-dot { width: 26px; height: 26px; font-size: 10px; }
+}
+
+@media (max-width: 600px) {
+  .page-main { padding: 16px 12px 72px; }
+  .step-body { padding: 16px 14px; }
+  .step-card-head { padding: 16px 14px 14px; }
+  .form-nav { padding: 14px; }
+  .step-title { font-size: 16px; }
+
+  /* Show mobile minimap, conditionally hide desktop nav on small screens */
+  .step-minimap { display: flex; }
+  .form-nav.form-nav-mobile-hide { display: none !important; }
+
+  .vax-card-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .vax-status-row { width: 100%; }
+  .vax-status-btn { flex: 1; text-align: center; padding: 8px 6px; }
+
+  .vax-dose-row { flex-wrap: wrap; }
+  .vax-dose-badge { min-width: auto; padding-bottom: 0; }
+  .vax-dose-inputs { flex-direction: column; }
+
+  .p-step-btn { min-width: 30px; }
+}
+
+@media (max-width: 420px) {
+  .progress-steps { justify-content: flex-start; overflow-x: scroll; gap: 0; }
+  .p-step-btn { min-width: 36px; }
+  .p-dot { width: 24px; height: 24px; }
+}
+
+/* ─── Force light mode (override OS dark preference) ──── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:              #f1f5f9;
+    --bg-card:         #ffffff;
+    --bg-input:        #f8fafc;
+    --border:          #e2e8f0;
+    --text:            #0f172a;
+    --text-muted:      #64748b;
+    --text-dim:        #475569;
+  }
+  body { background: #f1f5f9; color: #0f172a; }
+  .step-card { background: #ffffff; }
+  .step-title { color: #0f172a; }
+  select.fi option { background: #ffffff; color: #0f172a; }
+}
