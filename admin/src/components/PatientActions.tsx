@@ -11,11 +11,11 @@ import { CaresheetButton } from '@/components/CaresheetButton';
 import type { PatientWithUser } from '@/types/assessment-form';
 import { getErrorMessage } from '@/lib/get-error-message';
 
-function vaccineStatusShort(raw: unknown): string {
+/** Full vaccine line(s) for Gemini prompt — includes dose dates when stored as structured JSON. */
+function vaccineForKP3Prompt(raw: unknown): string {
   const s = formatVaccineForDocExport(raw);
   if (!s || s === '—') return 'Unknown';
-  const first = s.split('\n')[0].replace(/^Status:\s*/i, '').trim();
-  return first || 'Unknown';
+  return s.replace(/\s*\n\s*/g, ' | ').trim();
 }
 
 function parseJsonStringArray(raw: unknown): string[] {
@@ -35,9 +35,10 @@ function parseJsonStringArray(raw: unknown): string[] {
 function toKP3PPatient(patient: PatientWithUser): PatientData {
   const labs = { hb: '', tlc: '', platelets: '', crp: '', albumin: '' };
   const comorbidities = parseJsonStringArray(patient.comorbidities);
-  const specialNotes = patient.specialConsiderations?.trim()
-    ? [String(patient.specialConsiderations).trim()]
+  const specialConsiderationsRaw = patient.specialConsiderations?.trim()
+    ? String(patient.specialConsiderations).trim()
     : undefined;
+  const specialNotes = specialConsiderationsRaw ? [specialConsiderationsRaw] : undefined;
   const surg = parseJsonStringArray(patient.previousSurgeries);
   return {
     name: patient.name || '',
@@ -51,7 +52,11 @@ function toKP3PPatient(patient: PatientWithUser): PatientData {
     montreal: patient.montrealClass || '',
     severity: patient.currentDiseaseActivity || '',
     duration: patient.diseaseDuration || '',
-    ageAtDx: Number(patient.ageAtDiagnosis) || 0,
+    ageAtDx: patient.ageAtDiagnosis == null ? 0 : Number(patient.ageAtDiagnosis),
+    ageAtDiagnosis:
+      patient.ageAtDiagnosis == null || String(patient.ageAtDiagnosis).trim() === ''
+        ? undefined
+        : Number(patient.ageAtDiagnosis),
     priorSurgeries: surg.length ? surg.join(', ') : undefined,
     bowelFreq: patient.stoolFrequency || '',
     bloodInStool: patient.bloodInStool || '',
@@ -75,16 +80,27 @@ function toKP3PPatient(patient: PatientWithUser): PatientData {
     comorbidities: comorbidities.length ? comorbidities : undefined,
     eim: patient.extraintestinalManif || undefined,
     specialNotes,
+    specialConsiderations: specialConsiderationsRaw,
     patientLanguage: carePlanPrimaryPatientLanguage(patient.preferredLanguage),
+    dateOfBirth: patient.dateOfBirth?.trim() || undefined,
+    vaccineInfluenza: vaccineForKP3Prompt(patient.influenza),
+    vaccineCovid: vaccineForKP3Prompt(patient.covid19),
+    vaccinePneumococcal: vaccineForKP3Prompt(patient.pneumococcal),
+    vaccineHepB: vaccineForKP3Prompt(patient.hepatitisB),
+    vaccineHepA: vaccineForKP3Prompt(patient.hepatitisA),
+    vaccineHepE: vaccineForKP3Prompt(patient.hepatitisE),
+    vaccineZoster: vaccineForKP3Prompt(patient.zoster),
+    vaccineTetanus: vaccineForKP3Prompt(patient.tetanusTdap),
+    vaccineMmr: vaccineForKP3Prompt(patient.mmrVaricella),
     vaccines: {
-      influenza: vaccineStatusShort(patient.influenza),
-      covid19: vaccineStatusShort(patient.covid19),
-      pneumococcal: vaccineStatusShort(patient.pneumococcal),
-      hepatitisA: vaccineStatusShort(patient.hepatitisA),
-      hepatitisB: vaccineStatusShort(patient.hepatitisB),
-      zoster: vaccineStatusShort(patient.zoster),
-      mmr: vaccineStatusShort(patient.mmrVaricella),
-      tdap: vaccineStatusShort(patient.tetanusTdap),
+      influenza: vaccineForKP3Prompt(patient.influenza),
+      covid19: vaccineForKP3Prompt(patient.covid19),
+      pneumococcal: vaccineForKP3Prompt(patient.pneumococcal),
+      hepatitisA: vaccineForKP3Prompt(patient.hepatitisA),
+      hepatitisB: vaccineForKP3Prompt(patient.hepatitisB),
+      zoster: vaccineForKP3Prompt(patient.zoster),
+      mmr: vaccineForKP3Prompt(patient.mmrVaricella),
+      tdap: vaccineForKP3Prompt(patient.tetanusTdap),
     },
   };
 }

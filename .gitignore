@@ -95,3 +95,6 @@ Desktop.ini
 .temporary/
 tmp/
 temp/
+
+# --- Local medical literature & prompt exports (do not push) ---
+medical-lit/
