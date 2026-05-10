@@ -93,6 +93,8 @@ occupation            String
 specialConsiderations String
 documents             String? @default("[]")
 
+assessmentComplete Boolean @default(false)
+
 createdAt DateTime @default(now())
 updatedAt DateTime @updatedAt
 }

@@ -257,12 +257,13 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
     return true;
   };
 
-  const persistProgress = async (): Promise<boolean> => {
+  const persistProgress = async (overrides?: Record<string, unknown>): Promise<boolean> => {
     try {
+      const payload = { ...(formData as unknown as Record<string, unknown>), ...overrides };
       const res = await fetch(`/api/patient/${patient.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         let msg = 'Failed to save progress';
@@ -318,7 +319,7 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
     setIsSubmitting(true);
     setError('');
     try {
-      const ok = await persistProgress();
+      const ok = await persistProgress({ assessmentComplete: true });
       if (!ok) return;
       router.push(`/admin/patient/${patient.id}`);
       router.refresh();

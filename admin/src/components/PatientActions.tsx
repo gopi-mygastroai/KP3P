@@ -224,35 +224,39 @@ Format: 3-page concise care plan. Part1(Clinical Protocol):English. Part2(Patien
         }}
       >
 
-        <CaresheetButton patient={toKP3PPatient(patient)} label="📋 Download KP-3P Care Sheet" />
+        {patient.assessmentComplete ? (
+          <>
+            <CaresheetButton patient={toKP3PPatient(patient)} label="📋 Download KP-3P Care Sheet" />
 
-        {/* ── EXPORT DROPDOWN ── */}
-        <div style={{ position: 'relative' }} ref={dropdownRef}>
-          <button
-            onClick={() => setShowDropdown(!showDropdown)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              fontSize: 12, padding: '6px 14px', borderRadius: 7,
-              border: '1px solid rgba(255,255,255,0.35)',
-              background: 'rgba(255,255,255,0.08)',
-              color: '#fff', cursor: 'pointer',
-              fontWeight: 500, fontFamily: 'Inter, sans-serif', transition: 'all 0.2s',
-            }}
-          >
-            Export ▼
-          </button>
-          {showDropdown && (
-            <div style={{
-              position: 'absolute', right: 0, top: '100%', marginTop: '6px',
-              background: '#ffffff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-              overflow: 'hidden', zIndex: 50, minWidth: 160, display: 'flex', flexDirection: 'column'
-            }}>
-              <button onClick={() => { setShowDropdown(false); generatePdf(); }} style={{ padding: '10px 16px', fontSize: 13, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', color: '#334155' }} onMouseOver={(e) => (e.currentTarget.style.background = '#f8fafc')} onMouseOut={(e) => (e.currentTarget.style.background = 'none')}>Export as PDF</button>
-              <button onClick={() => { setShowDropdown(false); generateDocx(); }} style={{ padding: '10px 16px', fontSize: 13, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', color: '#334155' }} onMouseOver={(e) => (e.currentTarget.style.background = '#f8fafc')} onMouseOut={(e) => (e.currentTarget.style.background = 'none')}>Export as DOCX</button>
-              <button onClick={() => { setShowDropdown(false); handleExportDrive(); }} disabled={uploading} style={{ padding: '10px 16px', fontSize: 13, textAlign: 'left', background: 'none', border: 'none', cursor: uploading ? 'not-allowed' : 'pointer', color: '#334155', opacity: uploading ? 0.6 : 1 }} onMouseOver={(e) => (e.currentTarget.style.background = '#f8fafc')} onMouseOut={(e) => (e.currentTarget.style.background = 'none')}>{uploading ? 'Exporting to Drive...' : 'Export PDF to Drive'}</button>
+            <div style={{ position: 'relative' }} ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setShowDropdown(!showDropdown)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  fontSize: 12, padding: '6px 14px', borderRadius: 7,
+                  border: '1px solid rgba(255,255,255,0.35)',
+                  background: 'rgba(255,255,255,0.08)',
+                  color: '#fff', cursor: 'pointer',
+                  fontWeight: 500, fontFamily: 'Inter, sans-serif', transition: 'all 0.2s',
+                }}
+              >
+                Export ▼
+              </button>
+              {showDropdown && (
+                <div style={{
+                  position: 'absolute', right: 0, top: '100%', marginTop: '6px',
+                  background: '#ffffff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                  overflow: 'hidden', zIndex: 50, minWidth: 160, display: 'flex', flexDirection: 'column'
+                }}>
+                  <button type="button" onClick={() => { setShowDropdown(false); generatePdf(); }} style={{ padding: '10px 16px', fontSize: 13, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', color: '#334155' }} onMouseOver={(e) => (e.currentTarget.style.background = '#f8fafc')} onMouseOut={(e) => (e.currentTarget.style.background = 'none')}>Export as PDF</button>
+                  <button type="button" onClick={() => { setShowDropdown(false); generateDocx(); }} style={{ padding: '10px 16px', fontSize: 13, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', color: '#334155' }} onMouseOver={(e) => (e.currentTarget.style.background = '#f8fafc')} onMouseOut={(e) => (e.currentTarget.style.background = 'none')}>Export as DOCX</button>
+                  <button type="button" onClick={() => { setShowDropdown(false); handleExportDrive(); }} disabled={uploading} style={{ padding: '10px 16px', fontSize: 13, textAlign: 'left', background: 'none', border: 'none', cursor: uploading ? 'not-allowed' : 'pointer', color: '#334155', opacity: uploading ? 0.6 : 1 }} onMouseOver={(e) => (e.currentTarget.style.background = '#f8fafc')} onMouseOut={(e) => (e.currentTarget.style.background = 'none')}>{uploading ? 'Exporting to Drive...' : 'Export PDF to Drive'}</button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        ) : null}
 
         {/* ── EDIT DETAILS BUTTON ── */}
         <button

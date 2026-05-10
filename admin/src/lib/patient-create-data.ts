@@ -143,5 +143,6 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
     occupation: typeof b.occupation === 'string' ? b.occupation : '',
     specialConsiderations: typeof b.specialConsiderations === 'string' ? b.specialConsiderations : '',
     documents: normalizeJsonArray(documents),
+    assessmentComplete: b.assessmentComplete === true,
   };
 }
