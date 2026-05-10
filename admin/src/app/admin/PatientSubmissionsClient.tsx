@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import AddPatientButton from './AddPatientButton';
 import RefreshButton from './RefreshButton';
 
 export type PatientRow = {
@@ -91,7 +92,11 @@ export default function PatientSubmissionsClient({ patients }: { patients: Patie
                 : `${total} ${total === 1 ? 'record' : 'records'}`}
             </span>
           </div>
-          <div className="ad-card-header-actions">
+          <div
+            className="ad-card-header-actions"
+            style={{ display: 'flex', alignItems: 'stretch', gap: 10, flexWrap: 'wrap' }}
+          >
+            <AddPatientButton />
             <RefreshButton />
           </div>
         </div>
