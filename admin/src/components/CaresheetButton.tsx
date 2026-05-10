@@ -1,11 +1,18 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { PatientData } from '@/lib/kp3p-prompt';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 const DEFAULT_CARESHEET_FAILURE =
   'Care sheet generation failed. Please try again or contact support.';
+
+function isAbortError(e: unknown): boolean {
+  return (
+    (e instanceof DOMException && e.name === 'AbortError') ||
+    (e instanceof Error && e.name === 'AbortError')
+  );
+}
 
 async function readJsonSafe(res: Response): Promise<Record<string, unknown>> {
   try {
@@ -28,13 +35,23 @@ export function CaresheetButton({
   label?: string;
 }) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'preview'>('idle');
+  /** Which long-running step is active when `status === 'loading'` (for LLM cancel only). */
+  const [loadingPhase, setLoadingPhase] = useState<'none' | 'llm' | 'pdf'>('none');
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [htmlContent, setHtmlContent] = useState('');
   const previewRef = useRef<HTMLDivElement>(null);
+  const llmAbortRef = useRef<AbortController | null>(null);
 
   const dismissBanner = () => setBannerError(null);
 
+  const handleCancelLlmGeneration = useCallback(() => {
+    llmAbortRef.current?.abort();
+  }, []);
+
   const handleGenerateClick = async () => {
+    const ac = new AbortController();
+    llmAbortRef.current = ac;
+    setLoadingPhase('llm');
     setStatus('loading');
     setBannerError(null);
     try {
@@ -42,6 +59,7 @@ export function CaresheetButton({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patient),
+        signal: ac.signal,
       });
       const data = await readJsonSafe(res);
       const apiMessage = typeof data.error === 'string' && data.error.trim() ? data.error : null;
@@ -61,14 +79,23 @@ export function CaresheetButton({
 
       setHtmlContent(html);
       setStatus('preview');
-    } catch {
+    } catch (e: unknown) {
+      if (isAbortError(e)) {
+        setBannerError(null);
+        setStatus('idle');
+        return;
+      }
       setBannerError(DEFAULT_CARESHEET_FAILURE);
       setStatus('idle');
+    } finally {
+      llmAbortRef.current = null;
+      setLoadingPhase('none');
     }
   };
 
   const downloadPdf = async () => {
     if (!previewRef.current) return;
+    setLoadingPhase('pdf');
     setStatus('loading');
     setBannerError(null);
     try {
@@ -106,6 +133,8 @@ export function CaresheetButton({
     } catch {
       setBannerError('PDF download failed. Please try again.');
       setStatus('preview');
+    } finally {
+      setLoadingPhase('none');
     }
   };
 
@@ -180,8 +209,31 @@ export function CaresheetButton({
             opacity: status === 'loading' ? 0.88 : 1,
           }}
         >
-          {status === 'loading' ? '⏳ Generating...' : label || '📋 Generate KP-3P Care Sheet'}
+          {status === 'loading' && loadingPhase === 'pdf'
+            ? '⏳ Building PDF…'
+            : status === 'loading'
+              ? '⏳ Generating…'
+              : label || '📋 Generate KP-3P Care Sheet'}
         </button>
+        {status === 'loading' && loadingPhase === 'llm' && (
+          <button
+            type="button"
+            onClick={handleCancelLlmGeneration}
+            style={{
+              fontSize: 12,
+              padding: '6px 14px',
+              borderRadius: 7,
+              border: '1px solid #fecdd3',
+              background: '#fff1f2',
+              color: '#be123c',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontFamily: 'Inter, sans-serif',
+            }}
+          >
+            Cancel generation
+          </button>
+        )}
       </div>
 
       {status === 'preview' && (

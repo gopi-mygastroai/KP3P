@@ -4,66 +4,16 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { preferredLanguageScalarForForm } from '@/lib/preferredLanguagePrompt';
-import { normalizeSmokingStatusForForm } from '@/lib/smoking';
 import {
   AdminStep1, AdminStep2, AdminStep4, AdminStep5,
   AdminStep6, AdminStep7, AdminStep8, AdminStep9
 } from './AdminAssessmentSteps';
 import type { PatientWithUser, AssessmentFormState, AssessmentUpdateFn } from '@/types/assessment-form';
 import { getErrorMessage } from '@/lib/get-error-message';
+import { assessmentField, buildAssessmentFormState } from '@/lib/build-assessment-form-state';
 
-function assessmentField(data: AssessmentFormState, key: string): unknown {
-  return (data as Record<string, unknown>)[key];
-}
-
-function buildAssessmentFormState(patient: PatientWithUser): AssessmentFormState {
-  let previousSurgeries: string | string[] = patient.previousSurgeries;
-  try {
-    if (typeof previousSurgeries === 'string') {
-      const p = JSON.parse(previousSurgeries) as unknown;
-      previousSurgeries = Array.isArray(p) ? (p as string[]) : previousSurgeries;
-    }
-  } catch { /* keep string */ }
-
-  let previousTreatmentsTried: string | string[] = patient.previousTreatmentsTried;
-  try {
-    if (typeof previousTreatmentsTried === 'string') {
-      const p = JSON.parse(previousTreatmentsTried) as unknown;
-      previousTreatmentsTried = Array.isArray(p) ? (p as string[]) : previousTreatmentsTried;
-    }
-  } catch { /* keep string */ }
-
-  let comorbidities: string | string[] = patient.comorbidities;
-  try {
-    if (typeof comorbidities === 'string') {
-      const p = JSON.parse(comorbidities) as unknown;
-      comorbidities = Array.isArray(p) ? (p as string[]) : comorbidities;
-    }
-  } catch { /* keep string */ }
-
-  let documents: unknown = patient.documents ?? '[]';
-  if (typeof documents === 'string') {
-    try {
-      const p = JSON.parse(documents) as unknown;
-      documents = Array.isArray(p) ? p : [];
-    } catch {
-      documents = [];
-    }
-  } else if (!Array.isArray(documents)) {
-    documents = [];
-  }
-
-  return {
-    ...patient,
-    previousSurgeries,
-    previousTreatmentsTried,
-    comorbidities,
-    documents,
-    smokingStatus: normalizeSmokingStatusForForm(patient.smokingStatus),
-    smokingDetails: patient.smokingDetails ?? '',
-    preferredLanguage: preferredLanguageScalarForForm(patient.preferredLanguage),
-  };
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
 const stepLabels = [
@@ -94,6 +44,7 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<AssessmentFormState>(() => buildAssessmentFormState(patient));
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingStep, setIsSavingStep] = useState(false);
   const [error, setError] = useState('');
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
@@ -306,8 +257,38 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
     return true;
   };
 
-  const handleNext = () => {
+  const persistProgress = async (): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/patient/${patient.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      if (!res.ok) {
+        let msg = 'Failed to save progress';
+        try {
+          const j: unknown = await res.json();
+          if (isRecord(j) && typeof j.error === 'string') msg = j.error;
+        } catch {
+          /* ignore */
+        }
+        setError(msg);
+        return false;
+      }
+      return true;
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+      return false;
+    }
+  };
+
+  const handleNext = async () => {
     if (!validateCurrentStep()) return;
+    setIsSavingStep(true);
+    setError('');
+    const ok = await persistProgress();
+    setIsSavingStep(false);
+    if (!ok) return;
     if (currentStep < totalSteps) setCurrentStep((prev) => prev + 1);
   };
 
@@ -315,17 +296,30 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
     if (currentStep > 1) setCurrentStep((prev) => prev - 1);
   };
 
-  const handleSave = async () => {
+  /** Persist draft and leave — no per-step validation (partial save). */
+  const handleSaveAndExit = async () => {
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const ok = await persistProgress();
+      if (!ok) return;
+      router.push(`/admin/patient/${patient.id}`);
+      router.refresh();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /** Last step only: require mandatory fields, then save and return to patient. */
+  const handleCompleteAssessment = async () => {
     if (!validateCurrentStep()) return;
     setIsSubmitting(true);
     setError('');
     try {
-      const res = await fetch(`/api/patient/${patient.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      if (!res.ok) throw new Error('Failed to save assessment');
+      const ok = await persistProgress();
+      if (!ok) return;
       router.push(`/admin/patient/${patient.id}`);
       router.refresh();
     } catch (err: unknown) {
@@ -336,16 +330,14 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
   };
 
   const handleSaveAndLogout = async () => {
-    if (!validateCurrentStep()) return;
     setIsSubmitting(true);
     setError('');
     try {
-      const res = await fetch(`/api/patient/${patient.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      if (!res.ok) throw new Error('Failed to save');
+      const ok = await persistProgress();
+      if (!ok) {
+        setIsSubmitting(false);
+        return;
+      }
       await fetch('/api/auth/logout', { method: 'POST' });
       router.push('/');
     } catch (err: unknown) {
@@ -604,7 +596,7 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
           {/* Bottom navigation */}
           <div className="aw-bottom-nav" style={{ display: 'flex', alignItems: 'center', paddingTop: 20, borderTop: '0.5px solid #e2e8f0' }}>
             {currentStep > 1 && (
-              <button onClick={handleBack} disabled={isSubmitting} style={{
+              <button onClick={handleBack} disabled={isSubmitting || isSavingStep} style={{
                 padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                 background: '#ffffff', border: '1px solid #e2e8f0', color: '#475569',
                 cursor: 'pointer', transition: 'all 0.2s', fontFamily: "'Inter', sans-serif",
@@ -612,26 +604,32 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
                 Back
               </button>
             )}
-            <button onClick={handleSave} disabled={isSubmitting} style={{
+            <button onClick={() => void handleSaveAndExit()} disabled={isSubmitting || isSavingStep} style={{
               padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
               background: '#ffffff', border: '1px solid #e2e8f0', color: '#475569',
-              cursor: isSubmitting ? 'not-allowed' : 'pointer', marginLeft: 'auto', transition: 'all 0.2s',
+              cursor: isSubmitting || isSavingStep ? 'not-allowed' : 'pointer', marginLeft: 'auto', transition: 'all 0.2s',
               fontFamily: "'Inter', sans-serif",
             }}>
               {isSubmitting ? 'Saving...' : 'Save & Exit'}
             </button>
             {currentStep < totalSteps ? (
-              <button onClick={handleNext} style={{
+              <button
+                type="button"
+                onClick={() => void handleNext()}
+                disabled={isSavingStep || isSubmitting}
+                style={{
                 padding: '8px 22px', borderRadius: 8, fontSize: 13, fontWeight: 700,
                 background: '#2563eb', border: 'none', color: '#ffffff',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                cursor: isSavingStep || isSubmitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 4px 12px rgba(37,99,235,0.25)', transition: 'all 0.2s',
                 fontFamily: "'Inter', sans-serif",
-              }}>
-                Next <span>→</span>
+                opacity: isSavingStep ? 0.85 : 1,
+              }}
+              >
+                {isSavingStep ? 'Saving…' : 'Next'} {!isSavingStep ? <span>→</span> : null}
               </button>
             ) : (
-              <button onClick={handleSave} disabled={isSubmitting} style={{
+              <button onClick={() => void handleCompleteAssessment()} disabled={isSubmitting || isSavingStep} style={{
                 padding: '8px 22px', borderRadius: 8, fontSize: 13, fontWeight: 700,
                 background: '#2563eb', border: 'none', color: '#ffffff',
                 cursor: isSubmitting ? 'not-allowed' : 'pointer',

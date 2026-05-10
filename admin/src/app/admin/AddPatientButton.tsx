@@ -1,41 +1,12 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 
 export default function AddPatientButton() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  const handleClick = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch('/api/admin/patients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-        credentials: 'same-origin',
-      });
-      const data: unknown = await res.json().catch(() => null);
-      const errMsg =
-        res.ok || !isRecord(data) ? '' : typeof data.error === 'string' ? data.error : '';
-      if (!res.ok) {
-        setError(errMsg || 'Could not create patient');
-        setLoading(false);
-        return;
-      }
-      if (!isRecord(data) || typeof data.patientId !== 'number') {
-        setError('Invalid response from server');
-        setLoading(false);
-        return;
-      }
-      router.push(`/admin/patient/${data.patientId}/assessment`);
-    } catch {
-      setError('Network error');
-      setLoading(false);
-    }
+  const handleClick = () => {
+    router.push('/admin/patient/new');
   };
 
   return (
@@ -43,8 +14,6 @@ export default function AddPatientButton() {
       <button
         type="button"
         onClick={handleClick}
-        disabled={loading}
-        aria-busy={loading}
         style={{
           background: 'rgba(13,148,136,0.1)',
           color: '#0d9488',
@@ -53,8 +22,8 @@ export default function AddPatientButton() {
           border: '1px solid rgba(13,148,136,0.35)',
           fontSize: '14px',
           fontWeight: 600,
-          cursor: loading ? 'not-allowed' : 'pointer',
-          opacity: loading ? 0.75 : 1,
+          cursor: 'pointer',
+          opacity: 1,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -64,17 +33,8 @@ export default function AddPatientButton() {
           fontFamily: 'inherit',
         }}
       >
-        {loading ? 'Creating…' : 'Add Patient'}
+        Add Patient
       </button>
-      {error ? (
-        <span role="alert" style={{ fontSize: 12, color: '#b91c1c', textAlign: 'center' }}>
-          {error}
-        </span>
-      ) : null}
     </div>
   );
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object' && !Array.isArray(v);
 }

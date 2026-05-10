@@ -45,3 +45,31 @@ export async function PUT(req: NextRequest, context: RouteContext): Promise<Next
     );
   }
 }
+
+export async function DELETE(_req: NextRequest, context: RouteContext): Promise<NextResponse> {
+  try {
+    const cookieStore = await cookies();
+    const userRole = cookieStore.get('userRole');
+    if (userRole?.value !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const idParam = await context.params;
+    const patientId = parseInt(idParam.id, 10);
+    if (Number.isNaN(patientId)) {
+      return NextResponse.json({ error: 'Invalid patient ID' }, { status: 400 });
+    }
+
+    await prisma.patient.delete({
+      where: { id: patientId },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    console.error('Delete patient error:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete patient: ' + getErrorMessage(error) },
+      { status: 500 },
+    );
+  }
+}

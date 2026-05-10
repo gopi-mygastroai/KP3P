@@ -3,11 +3,15 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PatientWithUser } from '@/types/assessment-form';
+import { getErrorMessage } from '@/lib/get-error-message';
 
 export default function PatientEditForm({ patient }: { patient: PatientWithUser }) {
   const router = useRouter();
   const [formData, setFormData] = useState<PatientWithUser>(patient);
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const handleChange = (field: keyof PatientWithUser, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value } as PatientWithUser));
@@ -31,6 +35,33 @@ export default function PatientEditForm({ patient }: { patient: PatientWithUser 
       alert('Error saving data');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await fetch(`/api/patients/${patient.id}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      if (!res.ok) {
+        const data: unknown = await res.json().catch(() => null);
+        const msg =
+          data && typeof data === 'object' && data !== null && 'error' in data && typeof (data as { error: unknown }).error === 'string'
+            ? (data as { error: string }).error
+            : 'Failed to delete patient';
+        setDeleteError(msg);
+        setIsDeleting(false);
+        return;
+      }
+      setShowDeleteDialog(false);
+      router.push('/admin');
+      router.refresh();
+    } catch (err: unknown) {
+      setDeleteError(getErrorMessage(err));
+      setIsDeleting(false);
     }
   };
 
@@ -256,9 +287,13 @@ export default function PatientEditForm({ patient }: { patient: PatientWithUser 
           padding: 16px 32px;
           display: flex;
           justify-content: flex-end;
+          align-items: center;
           gap: 12px;
           z-index: 100;
           box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
+        }
+        .pr-action-bar-delete-wrap {
+          margin-right: auto;
         }
 
         .btn-cancel {
@@ -290,6 +325,82 @@ export default function PatientEditForm({ patient }: { patient: PatientWithUser 
         }
         .btn-save:hover { background: #0f766e; transform: translateY(-1px); }
         .btn-save:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        .btn-delete {
+          background: #fff1f2;
+          color: #be123c;
+          border: 1px solid #fecdd3;
+          padding: 10px 20px;
+          border-radius: 8px;
+          font-family: 'Inter', sans-serif;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .btn-delete:hover:not(:disabled) {
+          background: #ffe4e6;
+          border-color: #fda4af;
+        }
+        .btn-delete:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .pr-delete-dialog-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 200;
+          padding: 16px;
+        }
+        .pr-delete-dialog {
+          background: #ffffff;
+          border-radius: 16px;
+          padding: 28px 24px;
+          max-width: 400px;
+          width: 100%;
+          box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+        }
+        .pr-delete-dialog h2 {
+          font-family: 'Syne', sans-serif;
+          font-size: 18px;
+          font-weight: 700;
+          color: #0f172a;
+          margin: 0 0 10px;
+        }
+        .pr-delete-dialog p {
+          font-size: 14px;
+          color: #64748b;
+          line-height: 1.55;
+          margin: 0 0 20px;
+        }
+        .pr-delete-dialog-actions {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .pr-delete-dialog-actions button {
+          padding: 10px 16px;
+          border-radius: 9px;
+          font-size: 14px;
+          font-weight: 600;
+          font-family: 'Inter', sans-serif;
+          cursor: pointer;
+          border: none;
+          width: 100%;
+        }
+        .pr-delete-dialog-cancel {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0 !important;
+          color: #475569;
+        }
+        .pr-delete-dialog-confirm {
+          background: #dc2626;
+          color: #ffffff;
+        }
+        .pr-delete-dialog-confirm:disabled { opacity: 0.7; cursor: not-allowed; }
+
         @media (max-width: 768px) {
           .pr-header-band { padding: 20px 24px; }
           .pr-body { padding: 20px 24px 80px; gap: 20px; }
@@ -299,8 +410,9 @@ export default function PatientEditForm({ patient }: { patient: PatientWithUser 
           .pr-header-band { padding: 16px; }
           .pr-body { padding: 16px 16px 80px; gap: 16px; }
           .pr-vaccine-grid { grid-template-columns: 1fr; }
-          .pr-action-bar { padding: 12px 16px; flex-wrap: wrap; justify-content: space-between; }
-          .btn-cancel, .btn-save { flex: 1; text-align: center; }
+          .pr-action-bar { padding: 12px 16px; flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
+          .btn-delete { width: 100%; order: 3; }
+          .btn-cancel, .btn-save { flex: 1; text-align: center; min-width: 0; }
         }
       `}</style>
 
@@ -491,13 +603,67 @@ export default function PatientEditForm({ patient }: { patient: PatientWithUser 
         </div>
 
         <div className="pr-action-bar">
-          <button className="btn-cancel" onClick={() => router.push(`/admin/patient/${patient.id}`)} disabled={isSaving}>
+          <div className="pr-action-bar-delete-wrap">
+            <button
+              type="button"
+              className="btn-delete"
+              onClick={() => {
+                setDeleteError('');
+                setShowDeleteDialog(true);
+              }}
+              disabled={isSaving || isDeleting}
+            >
+              Delete patient
+            </button>
+          </div>
+          <button className="btn-cancel" onClick={() => router.push(`/admin/patient/${patient.id}`)} disabled={isSaving || isDeleting}>
             Cancel
           </button>
-          <button className="btn-save" onClick={handleSave} disabled={isSaving}>
+          <button className="btn-save" onClick={handleSave} disabled={isSaving || isDeleting}>
             {isSaving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
+
+        {showDeleteDialog && (
+          <div
+            className="pr-delete-dialog-overlay"
+            role="presentation"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isDeleting) setShowDeleteDialog(false);
+            }}
+          >
+            <div className="pr-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="pr-delete-title">
+              <h2 id="pr-delete-title">Delete this patient?</h2>
+              <p>
+                This permanently removes the record for <strong style={{ color: '#0f172a' }}>{patient.name}</strong> (ID #{patient.id}
+                {patient.mrn ? `, MRN ${patient.mrn}` : ''}). This cannot be undone.
+              </p>
+              {deleteError ? (
+                <p style={{ color: '#dc2626', fontSize: 13, marginTop: -8, marginBottom: 12 }} role="alert">
+                  {deleteError}
+                </p>
+              ) : null}
+              <div className="pr-delete-dialog-actions">
+                <button
+                  type="button"
+                  className="pr-delete-dialog-confirm"
+                  onClick={() => void handleDeleteConfirm()}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting…' : 'Yes, delete patient'}
+                </button>
+                <button
+                  type="button"
+                  className="pr-delete-dialog-cancel"
+                  onClick={() => !isDeleting && setShowDeleteDialog(false)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

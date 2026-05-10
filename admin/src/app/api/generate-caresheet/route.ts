@@ -90,6 +90,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
       aiResponse = await fetch(url, {
         method: 'POST',
+        signal: req.signal,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -113,6 +114,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }),
       });
     } catch (fetchErr) {
+      if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
+        logCaresheetFailure(patientIdForLog, 'gemini_fetch_aborted', fetchErr);
+        return new NextResponse(null, { status: 499 });
+      }
       logCaresheetFailure(patientIdForLog, 'gemini_fetch_threw', fetchErr);
       return NextResponse.json({ error: USER_FRIENDLY_502 }, { status: 502 });
     }
