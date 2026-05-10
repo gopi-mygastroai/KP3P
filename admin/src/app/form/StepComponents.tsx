@@ -1,4 +1,5 @@
-import type { FormData } from './formData';
+import type { FormData, IntakeUploadedDocument } from './formData';
+import { getErrorMessage } from '@/lib/get-error-message';
 import { useRef, useState } from 'react';
 
 interface StepProps {
@@ -161,8 +162,8 @@ export function Step3({ data, updateData }: StepProps) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('patientName', String((data as any).name || ''));
-      formData.append('mrn', String((data as any).mrn || ''));
+      formData.append('patientName', String(data.name || ''));
+      formData.append('mrn', String(data.mrn || ''));
       
       const res = await fetch('/api/drive/upload', {
         method: 'POST',
@@ -175,18 +176,22 @@ export function Step3({ data, updateData }: StepProps) {
         throw new Error(responseData.error || 'Failed to upload to Google Drive');
       }
 
-      const newDoc = {
+      const newDoc: IntakeUploadedDocument = {
         name: responseData.driveFileName || file.name,
         originalName: file.name,
         type: file.type,
         url: responseData.webViewLink,
         fileId: responseData.fileId,
       };
-      
-      const currentDocs = Array.isArray((data as any).documents) ? (data as any).documents : [];
-      updateData({ documents: [...currentDocs, newDoc] } as any);
-    } catch (err: any) {
-      alert("Upload failed: " + err.message + "\n\nMake sure your .env has Google Drive credentials configured.");
+
+      const currentDocs: IntakeUploadedDocument[] = Array.isArray(data.documents) ? data.documents : [];
+      updateData({ documents: [...currentDocs, newDoc] });
+    } catch (err: unknown) {
+      alert(
+        'Upload failed: ' +
+          getErrorMessage(err) +
+          '\n\nMake sure your .env has Google Drive credentials configured.',
+      );
     } finally {
       setUploading(false);
     }
@@ -222,20 +227,20 @@ export function Step3({ data, updateData }: StepProps) {
             {uploading ? 'Uploading...' : 'Upload Image or PDF'}
           </button>
           
-          {(data as any).documents && (data as any).documents.length > 0 && (
+          {Array.isArray(data.documents) && data.documents.length > 0 && (
             <div className="w-full mt-4 text-left">
               <p className="text-sm font-semibold text-gray-400 mb-2">Attached Documents:</p>
               <ul className="space-y-2">
-                {(data as any).documents.map((doc: any, i: number) => (
+                {data.documents.map((doc: IntakeUploadedDocument, i: number) => (
                   <li key={i} className="flex justify-between items-center bg-slate-800 px-3 py-2 rounded-lg text-sm text-gray-200">
                     <span className="truncate max-w-[200px]">{doc.name}</span>
                     <button 
                       type="button"
                       className="text-red-400 hover:text-red-300"
                       onClick={() => {
-                        const newDocs = [...(data as any).documents];
+                        const newDocs = [...data.documents];
                         newDocs.splice(i, 1);
-                        updateData({ documents: newDocs } as any);
+                        updateData({ documents: newDocs });
                       }}
                     >
                       Remove

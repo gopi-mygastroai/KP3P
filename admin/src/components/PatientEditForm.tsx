@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { PatientWithUser } from '@/types/assessment-form';
 
-export default function PatientEditForm({ patient }: { patient: any }) {
+export default function PatientEditForm({ patient }: { patient: PatientWithUser }) {
   const router = useRouter();
-  const [formData, setFormData] = useState(patient);
+  const [formData, setFormData] = useState<PatientWithUser>(patient);
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleChange = (field: string, value: any) => {
-    setFormData((prev: any) => ({ ...prev, [field]: value }));
+  const handleChange = (field: keyof PatientWithUser, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value } as PatientWithUser));
   };
 
   const handleSave = async () => {
@@ -33,25 +34,31 @@ export default function PatientEditForm({ patient }: { patient: any }) {
     }
   };
 
-  const getArrayValue = (field: string) => {
+  const getArrayValue = (field: keyof PatientWithUser): string[] => {
     try {
-      return Array.isArray(formData[field]) ? formData[field] : JSON.parse(formData[field] || '[]');
+      const raw = formData[field];
+      if (Array.isArray(raw)) return raw as string[];
+      if (typeof raw === 'string') {
+        const p = JSON.parse(raw || '[]') as unknown;
+        return Array.isArray(p) ? p.map((x) => String(x)) : [];
+      }
+      return [];
     } catch {
       return [];
     }
   };
 
-  const handleArrayChange = (field: string, text: string) => {
-    const arr = text.split(',').map(s => s.trim()).filter(s => s !== '');
+  const handleArrayChange = (field: keyof PatientWithUser, text: string) => {
+    const arr = text.split(',').map((s) => s.trim()).filter((s) => s !== '');
     handleChange(field, JSON.stringify(arr));
   };
 
-  const renderField = (label: string, field: string, type = 'text', readOnly = false) => (
+  const renderField = (label: string, field: keyof PatientWithUser, type = 'text', readOnly = false) => (
     <div className="pr-field">
       <label className="pr-field-label">{label}</label>
       {type === 'textarea' ? (
         <textarea
-          value={formData[field] || ''}
+          value={String(formData[field] ?? '')}
           onChange={(e) => handleChange(field, e.target.value)}
           readOnly={readOnly}
           className="pr-input"
@@ -60,7 +67,7 @@ export default function PatientEditForm({ patient }: { patient: any }) {
       ) : (
         <input
           type={type}
-          value={formData[field] || ''}
+          value={String(formData[field] ?? '')}
           onChange={(e) => handleChange(field, e.target.value)}
           readOnly={readOnly}
           className={`pr-input ${readOnly ? 'read-only' : ''}`}
@@ -69,7 +76,7 @@ export default function PatientEditForm({ patient }: { patient: any }) {
     </div>
   );
 
-  const renderArrayField = (label: string, field: string) => {
+  const renderArrayField = (label: string, field: keyof PatientWithUser) => {
     const val = getArrayValue(field).join(', ');
     return (
       <div className="pr-field" style={{ gridColumn: '1/-1' }}>

@@ -65,13 +65,19 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
 
   const renderVaccineCard = (name: string, dataStr: string) => {
     let status = 'unknown';
-    let doses: any[] = [];
+    type VaccineDoseRow = { date?: string; dosage?: string };
+    let doses: VaccineDoseRow[] = [];
     try {
       if (dataStr) {
         const parsed = JSON.parse(dataStr);
         if (typeof parsed === 'object') {
           status = parsed.status || 'unknown';
-          doses = Array.isArray(parsed.doses) ? parsed.doses : [];
+          doses = Array.isArray(parsed.doses)
+            ? (parsed.doses as unknown[]).filter(
+                (x): x is VaccineDoseRow =>
+                  x !== null && typeof x === 'object' && !Array.isArray(x),
+              )
+            : [];
         } else { status = dataStr; }
       }
     } catch { status = dataStr || 'unknown'; }
@@ -90,7 +96,7 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
         </div>
         {doses.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {doses.map((d: any, i: number) => (
+            {doses.map((d: VaccineDoseRow, i: number) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', background: '#f1f5f9', padding: '6px 10px', borderRadius: 6, fontSize: 11.5, color: '#475569' }}>
                 <span>Dose {i + 1}: <span style={{ color: '#94a3b8' }}>{d.date || 'N/A'}</span></span>
                 {d.dosage && <span style={{ color: '#0891b2' }}>{d.dosage}</span>}

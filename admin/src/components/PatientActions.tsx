@@ -8,6 +8,8 @@ import { formatVaccineForDocExport } from '@/lib/formatVaccineExport';
 import { carePlanPrimaryPatientLanguage } from '@/lib/preferredLanguagePrompt';
 import type { PatientData } from '@/lib/kp3p-prompt';
 import { CaresheetButton } from '@/components/CaresheetButton';
+import type { PatientWithUser } from '@/types/assessment-form';
+import { getErrorMessage } from '@/lib/get-error-message';
 
 function vaccineStatusShort(raw: unknown): string {
   const s = formatVaccineForDocExport(raw);
@@ -30,7 +32,7 @@ function parseJsonStringArray(raw: unknown): string[] {
   return [];
 }
 
-function toKP3PPatient(patient: any): PatientData {
+function toKP3PPatient(patient: PatientWithUser): PatientData {
   const labs = { hb: '', tlc: '', platelets: '', crp: '', albumin: '' };
   const comorbidities = parseJsonStringArray(patient.comorbidities);
   const specialNotes = patient.specialConsiderations?.trim()
@@ -87,7 +89,7 @@ function toKP3PPatient(patient: any): PatientData {
   };
 }
 
-export default function PatientActions({ patient }: { patient: any }) {
+export default function PatientActions({ patient }: { patient: PatientWithUser }) {
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -103,7 +105,7 @@ export default function PatientActions({ patient }: { patient: any }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const patientEmailForExport = (p: any): string => {
+  const patientEmailForExport = (p: PatientWithUser): string => {
     const fromUser = p?.user?.email?.trim?.();
     if (fromUser) return fromUser;
     const fromPatient = typeof p?.email === 'string' ? p.email.trim() : '';
@@ -113,11 +115,14 @@ export default function PatientActions({ patient }: { patient: any }) {
   const escapeHtmlForWord = (text: string) =>
     text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-  const parseArray = (str: any) => {
+  const parseArray = (str: unknown) => {
     try {
-      const arr = JSON.parse(str || '[]');
+      if (typeof str !== 'string') return 'None';
+      const arr = JSON.parse(str || '[]') as unknown;
       return Array.isArray(arr) && arr.length > 0 ? arr.join(', ') : 'None';
-    } catch { return str || 'None'; }
+    } catch {
+      return typeof str === 'string' && str ? str : 'None';
+    }
   };
 
   const docContent = `Generate KP-3P protocol.
@@ -199,8 +204,8 @@ Format: 3-page concise care plan. Part1(Clinical Protocol):English. Part2(Patien
       if (!res.ok) throw new Error(data.error || 'Failed to upload to Google Drive');
       if (data.webViewLink) { alert('Successfully exported to Google Drive!\nLink: ' + data.webViewLink); window.open(data.webViewLink, '_blank'); }
       else { alert('Export successful, but no link was returned.'); }
-    } catch (err: any) {
-      alert('Error exporting: ' + err.message);
+    } catch (err: unknown) {
+      alert('Error exporting: ' + getErrorMessage(err));
     } finally {
       setUploading(false);
     }

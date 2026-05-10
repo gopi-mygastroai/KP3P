@@ -1,6 +1,17 @@
 import React from 'react';
+import type { AssessmentFormState, AssessmentUpdateFn } from '@/types/assessment-form';
+import { getErrorMessage } from '@/lib/get-error-message';
 
 const inter = "'Inter', sans-serif";
+
+function formValue(data: AssessmentFormState, key: string): unknown {
+  return (data as Record<string, unknown>)[key];
+}
+
+type StepComponentProps = {
+  data: AssessmentFormState;
+  updateData: AssessmentUpdateFn;
+};
 
 // ── Shared field wrapper ──────────────────────────────────────────────
 const FieldBox = ({
@@ -51,8 +62,8 @@ export const textInput = (
   name: string,
   label: string,
   type: string = 'text',
-  data: any,
-  updateData: any,
+  data: AssessmentFormState,
+  updateData: AssessmentUpdateFn,
   required: boolean = false,
 ) => (
   <FieldBox key={name} label={label} required={required}>
@@ -60,7 +71,10 @@ export const textInput = (
       type={type}
       style={inputStyle}
       required={required}
-      value={data[name] === '' || data[name] == null ? '' : data[name]}
+      value={(() => {
+        const v = formValue(data, name);
+        return v === '' || v == null ? '' : String(v);
+      })()}
       onChange={(e) => {
         const raw = e.target.value;
         if (type === 'number') {
@@ -78,8 +92,8 @@ export const textInput = (
 export const textArea = (
   name: string,
   label: string,
-  data: any,
-  updateData: any,
+  data: AssessmentFormState,
+  updateData: AssessmentUpdateFn,
   required: boolean = false,
   helpText?: string,
   helpExample?: string,
@@ -89,7 +103,7 @@ export const textArea = (
       style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }}
       rows={3}
       required={required}
-      value={data[name] || ''}
+      value={String(formValue(data, name) ?? '')}
       onChange={(e) => updateData({ [name]: e.target.value })}
       onFocus={(e) => (e.target.style.borderColor = '#0891b2')}
       onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
@@ -111,8 +125,8 @@ export const radioGroup = (
   name: string,
   label: string,
   options: string[],
-  data: any,
-  updateData: any,
+  data: AssessmentFormState,
+  updateData: AssessmentUpdateFn,
   required: boolean = false,
 ) => (
   <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -125,7 +139,7 @@ export const radioGroup = (
     </label>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       {options.map((opt, i) => {
-        const isSelected = data[name] === opt;
+        const isSelected = formValue(data, name) === opt;
         return (
           <label key={opt} style={{
             display: 'flex', alignItems: 'center', gap: 7,
@@ -157,11 +171,12 @@ export const checkboxGroup = (
   name: string,
   label: string,
   options: string[],
-  data: any,
-  updateData: any,
+  data: AssessmentFormState,
+  updateData: AssessmentUpdateFn,
   required: boolean = false,
 ) => {
-  const selected = Array.isArray(data[name]) ? data[name] : [];
+  const raw = formValue(data, name);
+  const selected = Array.isArray(raw) ? (raw as string[]) : [];
   const handleToggle = (opt: string) => {
     if (selected.includes(opt)) {
       updateData({ [name]: selected.filter((item: string) => item !== opt) });
@@ -254,11 +269,12 @@ const Divider = ({ label }: { label: string }) => (
 );
 
 // ── Steps ─────────────────────────────────────────────────────────────
-export const AdminStep1 = ({ data, updateData }: any) => {
-  const handleDobUpdate = (fields: any) => {
+export const AdminStep1 = ({ data, updateData }: StepComponentProps) => {
+  const handleDobUpdate = (fields: Record<string, unknown>) => {
     updateData(fields);
-    if (fields.dateOfBirth) {
-      const dob = new Date(fields.dateOfBirth);
+    const dobRaw = fields.dateOfBirth;
+    if (typeof dobRaw === 'string' && dobRaw.trim() !== '') {
+      const dob = new Date(dobRaw);
       const today = new Date();
       let age = today.getFullYear() - dob.getFullYear();
       const m = today.getMonth() - dob.getMonth();
@@ -324,17 +340,45 @@ export const AdminStep1 = ({ data, updateData }: any) => {
 type VaccineDose = { date?: string; dosage?: string };
 
 // Parses vaccine field which may be a JSON object {status, doses} or plain string
-const parseVaccine = (val: any): { status: string; doses: VaccineDose[] } => {
-  if (!val) return { status: '', doses: [] };
-  if (typeof val === 'object' && val !== null) return { status: val.status || '', doses: Array.isArray(val.doses) ? val.doses : [] };
+const parseVaccine = (val: unknown): { status: string; doses: VaccineDose[] } => {
+  if (val == null || val === '') return { status: '', doses: [] };
+  if (typeof val === 'object' && !Array.isArray(val)) {
+    const o = val as Record<string, unknown>;
+    const status = typeof o.status === 'string' ? o.status : '';
+    const d = o.doses;
+    const doses = Array.isArray(d)
+      ? d.filter((x): x is VaccineDose => x !== null && typeof x === 'object' && !Array.isArray(x)).map((x) => {
+          const row = x as Record<string, unknown>;
+          return {
+            date: typeof row.date === 'string' ? row.date : undefined,
+            dosage: typeof row.dosage === 'string' ? row.dosage : undefined,
+          };
+        })
+      : [];
+    return { status, doses };
+  }
   if (typeof val === 'string') {
-    try { return JSON.parse(val); } catch { return { status: val, doses: [] }; }
+    try {
+      return parseVaccine(JSON.parse(val) as unknown);
+    } catch {
+      return { status: val, doses: [] };
+    }
   }
   return { status: '', doses: [] };
 };
 
-const VaccineInput = ({ name, label, data, updateData }: { name: string; label: string; data: any; updateData: any }) => {
-  const vaccine = parseVaccine(data[name]);
+const VaccineInput = ({
+  name,
+  label,
+  data,
+  updateData,
+}: {
+  name: string;
+  label: string;
+  data: AssessmentFormState;
+  updateData: AssessmentUpdateFn;
+}) => {
+  const vaccine = parseVaccine(formValue(data, name));
   const statusOptions = ['Given', 'Never', 'Unknown'];
 
   const updateVaccine = (patch: Partial<typeof vaccine>) => {
@@ -352,7 +396,7 @@ const VaccineInput = ({ name, label, data, updateData }: { name: string; label: 
   };
 
   const removeDose = (i: number) => {
-    const doses = vaccine.doses.filter((_: any, idx: number) => idx !== i);
+    const doses = vaccine.doses.filter((_d: VaccineDose, idx: number) => idx !== i);
     updateVaccine({ doses });
   };
 
@@ -438,7 +482,7 @@ const vaccineFields = [
   { name: 'tetanusTdap', label: 'Tetanus / Tdap' },
 ];
 
-export const AdminStep2 = ({ data, updateData }: any) => (
+export const AdminStep2 = ({ data, updateData }: StepComponentProps) => (
   <div>
     <Grid3>
       {vaccineFields.map(({ name, label }) => (
@@ -448,7 +492,14 @@ export const AdminStep2 = ({ data, updateData }: any) => (
   </div>
 );
 
-export const AdminStep3 = ({ data, updateData }: any) => {
+type AssessmentDocumentRow = {
+  name?: string;
+  url?: string;
+  originalName?: string;
+  fileId?: string;
+};
+
+export const AdminStep3 = ({ data, updateData }: StepComponentProps) => {
   const [uploading, setUploading] = React.useState(false);
   const [uploadError, setUploadError] = React.useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -487,8 +538,8 @@ export const AdminStep3 = ({ data, updateData }: any) => {
       }
 
       updateData({ documents: [...documents, ...uploaded] });
-    } catch (err: any) {
-      setUploadError(err.message || 'Upload failed');
+    } catch (err: unknown) {
+      setUploadError(getErrorMessage(err) || 'Upload failed');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -496,7 +547,7 @@ export const AdminStep3 = ({ data, updateData }: any) => {
   };
 
   const removeDocument = (i: number) => {
-    updateData({ documents: documents.filter((_: any, idx: number) => idx !== i) });
+    updateData({ documents: documents.filter((_doc: AssessmentDocumentRow, idx: number) => idx !== i) });
   };
 
   return (
@@ -554,7 +605,7 @@ export const AdminStep3 = ({ data, updateData }: any) => {
             <p style={{ fontSize: 13, color: '#94a3b8', fontFamily: inter, margin: 0 }}>No documents yet. Upload one above.</p>
           </div>
         ) : (
-          documents.map((doc: any, i: number) => (
+          documents.map((doc: AssessmentDocumentRow, i: number) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', gap: 12,
               background: '#ffffff', border: '1px solid #e2e8f0',
@@ -609,7 +660,7 @@ const PATIENT_DISEASE_DURATIONS = [
   '>10 years',
 ] as const;
 
-export const AdminStep4 = ({ data, updateData }: any) => (
+export const AdminStep4 = ({ data, updateData }: StepComponentProps) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
     <Grid2>
       {radioGroup('primaryDiagnosis', 'Primary Diagnosis', [...PATIENT_PRIMARY_DIAGNOSIS], data, updateData, true)}
@@ -635,7 +686,7 @@ export const AdminStep4 = ({ data, updateData }: any) => (
   </div>
 );
 
-export const AdminStep5 = ({ data, updateData }: any) => (
+export const AdminStep5 = ({ data, updateData }: StepComponentProps) => (
   <div>
     <Grid2>
       {radioGroup('currentDiseaseActivity', 'Current Disease Activity Level', ['Remission', 'Mild', 'Moderate', 'Severe'], data, updateData, true)}
@@ -661,7 +712,7 @@ export const AdminStep5 = ({ data, updateData }: any) => (
   </div>
 );
 
-export const AdminStep6 = ({ data, updateData }: any) => (
+export const AdminStep6 = ({ data, updateData }: StepComponentProps) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
     <FieldBox label="Date of Most Recent Labs" required>
       <input
@@ -743,7 +794,7 @@ export const AdminStep6 = ({ data, updateData }: any) => (
   </div>
 );
 
-export const AdminStep7 = ({ data, updateData }: any) => (
+export const AdminStep7 = ({ data, updateData }: StepComponentProps) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
     {textArea(
       'currentIbdMedications',
@@ -804,7 +855,7 @@ const PREVIOUS_IBD_TREATMENTS_OPTIONS = [
   'Other',
 ] as const;
 
-export const AdminStep8 = ({ data, updateData }: any) => (
+export const AdminStep8 = ({ data, updateData }: StepComponentProps) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
     {checkboxGroup('previousTreatmentsTried', 'Previous IBD Treatments Tried', [...PREVIOUS_IBD_TREATMENTS_OPTIONS], data, updateData, true)}
     {textArea(
@@ -819,7 +870,7 @@ export const AdminStep8 = ({ data, updateData }: any) => (
   </div>
 );
 
-export const AdminStep9 = ({ data, updateData }: any) => (
+export const AdminStep9 = ({ data, updateData }: StepComponentProps) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
     <ColumnStack>
       {radioGroup('tbScreening', 'TB Screening Status', [

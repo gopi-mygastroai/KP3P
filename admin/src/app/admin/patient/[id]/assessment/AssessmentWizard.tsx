@@ -10,6 +10,61 @@ import {
   AdminStep1, AdminStep2, AdminStep4, AdminStep5,
   AdminStep6, AdminStep7, AdminStep8, AdminStep9
 } from './AdminAssessmentSteps';
+import type { PatientWithUser, AssessmentFormState, AssessmentUpdateFn } from '@/types/assessment-form';
+import { getErrorMessage } from '@/lib/get-error-message';
+
+function assessmentField(data: AssessmentFormState, key: string): unknown {
+  return (data as Record<string, unknown>)[key];
+}
+
+function buildAssessmentFormState(patient: PatientWithUser): AssessmentFormState {
+  let previousSurgeries: string | string[] = patient.previousSurgeries;
+  try {
+    if (typeof previousSurgeries === 'string') {
+      const p = JSON.parse(previousSurgeries) as unknown;
+      previousSurgeries = Array.isArray(p) ? (p as string[]) : previousSurgeries;
+    }
+  } catch { /* keep string */ }
+
+  let previousTreatmentsTried: string | string[] = patient.previousTreatmentsTried;
+  try {
+    if (typeof previousTreatmentsTried === 'string') {
+      const p = JSON.parse(previousTreatmentsTried) as unknown;
+      previousTreatmentsTried = Array.isArray(p) ? (p as string[]) : previousTreatmentsTried;
+    }
+  } catch { /* keep string */ }
+
+  let comorbidities: string | string[] = patient.comorbidities;
+  try {
+    if (typeof comorbidities === 'string') {
+      const p = JSON.parse(comorbidities) as unknown;
+      comorbidities = Array.isArray(p) ? (p as string[]) : comorbidities;
+    }
+  } catch { /* keep string */ }
+
+  let documents: unknown = patient.documents ?? '[]';
+  if (typeof documents === 'string') {
+    try {
+      const p = JSON.parse(documents) as unknown;
+      documents = Array.isArray(p) ? p : [];
+    } catch {
+      documents = [];
+    }
+  } else if (!Array.isArray(documents)) {
+    documents = [];
+  }
+
+  return {
+    ...patient,
+    previousSurgeries,
+    previousTreatmentsTried,
+    comorbidities,
+    documents,
+    smokingStatus: normalizeSmokingStatusForForm(patient.smokingStatus),
+    smokingDetails: patient.smokingDetails ?? '',
+    preferredLanguage: preferredLanguageScalarForForm(patient.preferredLanguage),
+  };
+}
 
 const stepLabels = [
   "Basic Info",
@@ -33,21 +88,11 @@ const stepHeadings = [
   "Infection Screening & Comorbidities",
 ];
 
-export default function AssessmentWizard({ patient }: { patient: any }) {
+export default function AssessmentWizard({ patient }: { patient: PatientWithUser }) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<any>(() => {
-    const parsed = { ...patient };
-    try { if (typeof parsed.previousSurgeries === 'string') parsed.previousSurgeries = JSON.parse(parsed.previousSurgeries); } catch (e) { }
-    try { if (typeof parsed.previousTreatmentsTried === 'string') parsed.previousTreatmentsTried = JSON.parse(parsed.previousTreatmentsTried); } catch (e) { }
-    try { if (typeof parsed.comorbidities === 'string') parsed.comorbidities = JSON.parse(parsed.comorbidities); } catch (e) { }
-    try { if (typeof parsed.documents === 'string') parsed.documents = JSON.parse(parsed.documents); } catch (e) { }
-    parsed.smokingStatus = normalizeSmokingStatusForForm(parsed.smokingStatus);
-    if (parsed.smokingDetails == null) parsed.smokingDetails = '';
-    parsed.preferredLanguage = preferredLanguageScalarForForm(parsed.preferredLanguage);
-    return parsed;
-  });
+  const [formData, setFormData] = useState<AssessmentFormState>(() => buildAssessmentFormState(patient));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
@@ -55,7 +100,9 @@ export default function AssessmentWizard({ patient }: { patient: any }) {
   const totalSteps = 8;
 
   useEffect(() => {
-    setMounted(true);
+    queueMicrotask(() => {
+      setMounted(true);
+    });
   }, []);
 
   if (!patient) {
@@ -84,8 +131,8 @@ export default function AssessmentWizard({ patient }: { patient: any }) {
     );
   }
 
-  const updateData = (fields: any) => {
-    setFormData((prev: any) => ({ ...prev, ...fields }));
+  const updateData: AssessmentUpdateFn = (fields) => {
+    setFormData((prev) => ({ ...prev, ...fields }) as AssessmentFormState);
   };
 
   const validateCurrentStep = () => {
@@ -102,7 +149,7 @@ export default function AssessmentWizard({ patient }: { patient: any }) {
         { key: 'dateOfBirth', label: 'Date of Birth' },
       ];
       const missing = requiredFields
-        .filter(({ key }) => !isNonEmpty(formData?.[key]))
+        .filter(({ key }) => !isNonEmpty(assessmentField(formData, key)))
         .map(({ label }) => label);
 
       if (!isNonEmpty(formData?.sex)) missing.push('Sex');
@@ -117,10 +164,12 @@ export default function AssessmentWizard({ patient }: { patient: any }) {
         missing.push('Smoking amount');
       }
 
-      const ca = formData?.currentAge;
-      if (ca === '' || ca == null || !Number.isFinite(Number(ca))) missing.push('Current Age');
-      const ad = formData?.ageAtDiagnosis;
-      if (ad === '' || ad == null || !Number.isFinite(Number(ad))) missing.push('Age at Diagnosis');
+      const caRaw = assessmentField(formData, 'currentAge');
+      const caNum = typeof caRaw === 'number' ? caRaw : typeof caRaw === 'string' ? Number(caRaw) : NaN;
+      if (!Number.isFinite(caNum)) missing.push('Current Age');
+      const adRaw = assessmentField(formData, 'ageAtDiagnosis');
+      const adNum = typeof adRaw === 'number' ? adRaw : typeof adRaw === 'string' ? Number(adRaw) : NaN;
+      if (!Number.isFinite(adNum)) missing.push('Age at Diagnosis');
 
       const email = String(formData?.email ?? '').trim();
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -165,7 +214,7 @@ export default function AssessmentWizard({ patient }: { patient: any }) {
         { key: 'stoolFrequency', label: 'Frequency of Stools (per day)' },
       ];
       const missing = requiredFields
-        .filter(({ key }) => !String(formData?.[key] ?? '').trim())
+        .filter(({ key }) => !String(assessmentField(formData, key) ?? '').trim())
         .map(({ label }) => label);
 
       if (missing.length > 0) {
@@ -184,7 +233,7 @@ export default function AssessmentWizard({ patient }: { patient: any }) {
       ];
 
       const missing = requiredFields
-        .filter(({ key }) => !String(formData?.[key] ?? '').trim())
+        .filter(({ key }) => !String(assessmentField(formData, key) ?? '').trim())
         .map(({ label }) => label);
 
       if (missing.length > 0) {
@@ -199,7 +248,7 @@ export default function AssessmentWizard({ patient }: { patient: any }) {
         { key: 'responseToTreatment', label: 'Response to Current Treatment' },
       ];
       const missing = requiredFields
-        .filter(({ key }) => !String(formData?.[key] ?? '').trim())
+        .filter(({ key }) => !String(assessmentField(formData, key) ?? '').trim())
         .map(({ label }) => label);
 
       if (missing.length > 0) {
@@ -279,8 +328,8 @@ export default function AssessmentWizard({ patient }: { patient: any }) {
       if (!res.ok) throw new Error('Failed to save assessment');
       router.push(`/admin/patient/${patient.id}`);
       router.refresh();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -299,8 +348,8 @@ export default function AssessmentWizard({ patient }: { patient: any }) {
       if (!res.ok) throw new Error('Failed to save');
       await fetch('/api/auth/logout', { method: 'POST' });
       router.push('/');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
       setIsSubmitting(false);
     }
   };

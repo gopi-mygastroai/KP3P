@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getErrorMessage } from '@/lib/get-error-message';
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 
@@ -42,7 +43,7 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 200, headers });
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
@@ -175,13 +176,13 @@ export async function POST(req: Request) {
       webContentLink: response.data.webContentLink,
     }, { headers });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Google Drive Upload Error:', error);
     const headers = new Headers();
     headers.set('Access-Control-Allow-Origin', '*');
     return NextResponse.json(
-      { error: error.message || 'Failed to upload to Google Drive' },
-      { status: 500, headers }
+      { error: getErrorMessage(error) || 'Failed to upload to Google Drive' },
+      { status: 500, headers },
     );
   }
 }

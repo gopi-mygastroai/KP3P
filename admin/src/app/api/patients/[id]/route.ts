@@ -1,8 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
+import { patientCreateDataFromBody } from '@/lib/patient-create-data';
+import { getErrorMessage } from '@/lib/get-error-message';
 
-export async function PUT(req: Request, context: any) {
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function PUT(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   try {
     const cookieStore = await cookies();
     const userRole = cookieStore.get('userRole');
@@ -12,36 +20,28 @@ export async function PUT(req: Request, context: any) {
 
     const idParam = await context.params;
     const patientId = parseInt(idParam.id, 10);
-    if (isNaN(patientId)) {
+    if (Number.isNaN(patientId)) {
       return NextResponse.json({ error: 'Invalid patient ID' }, { status: 400 });
     }
 
-    const body = await req.json();
+    const raw: unknown = await req.json();
+    if (!isRecord(raw)) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
 
-    // Remove protected or relational fields that Prisma cannot directly update this way
-    const { id, user, userId, createdAt, updatedAt, ...updateData } = body;
-
-    if (Array.isArray(updateData.documents)) {
-      updateData.documents = JSON.stringify(updateData.documents);
-    }
-    if (Array.isArray(updateData.previousSurgeries)) {
-      updateData.previousSurgeries = JSON.stringify(updateData.previousSurgeries);
-    }
-    if (Array.isArray(updateData.previousTreatmentsTried)) {
-      updateData.previousTreatmentsTried = JSON.stringify(updateData.previousTreatmentsTried);
-    }
-    if (Array.isArray(updateData.comorbidities)) {
-      updateData.comorbidities = JSON.stringify(updateData.comorbidities);
-    }
+    const payload = patientCreateDataFromBody(raw);
 
     const updatedPatient = await prisma.patient.update({
       where: { id: patientId },
-      data: updateData,
+      data: payload,
     });
 
     return NextResponse.json({ success: true, patient: updatedPatient });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Update error:', error);
-    return NextResponse.json({ error: 'Failed to update patient: ' + error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to update patient: ' + getErrorMessage(error) },
+      { status: 500 },
+    );
   }
 }

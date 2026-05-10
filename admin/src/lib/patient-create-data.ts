@@ -1,5 +1,7 @@
 /** Build Prisma Patient.create `data` from intake JSON (handles MultiStepForm pre-stringified arrays). */
 
+import type { Prisma } from '@prisma/client';
+
 function normalizeJsonArray(val: unknown): string {
   if (Array.isArray(val)) return JSON.stringify(val);
   if (typeof val === 'string' && val.trim() !== '') {
@@ -51,13 +53,13 @@ function normalizePreferredLanguage(val: unknown): string {
 }
 
 /** Patient Health Records step: rows of { date, document } → scalar date + documents JSON with labDate on each. */
-function labsAndDocumentsFromBody(b: Record<string, any>): {
+function labsAndDocumentsFromBody(b: Record<string, unknown>): {
   dateMostRecentLabs: string;
   documents: unknown;
 } {
   if (Array.isArray(b.labReportRows) && b.labReportRows.length > 0) {
     const rows = b.labReportRows as Array<{ date?: string; document?: Record<string, unknown> | null }>;
-    const completed = rows.filter(r => String(r.date || '').trim() && r.document);
+    const completed = rows.filter((r) => String(r.date || '').trim() && r.document);
     let dateMostRecentLabs = '';
     if (completed.length > 0) {
       dateMostRecentLabs = completed.reduce(
@@ -65,66 +67,66 @@ function labsAndDocumentsFromBody(b: Record<string, any>): {
         '',
       );
     }
-    const documents = completed.map(r => ({
+    const documents = completed.map((r) => ({
       ...r.document,
       labDate: r.date,
     }));
     return { dateMostRecentLabs, documents };
   }
   return {
-    dateMostRecentLabs: b.dateMostRecentLabs || '',
+    dateMostRecentLabs: typeof b.dateMostRecentLabs === 'string' ? b.dateMostRecentLabs : '',
     documents: b.documents,
   };
 }
 
-export function patientCreateDataFromBody(body: Record<string, unknown>) {
-  const b = body as Record<string, any>;
+export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma.PatientCreateInput {
+  const b = body;
   const { dateMostRecentLabs, documents } = labsAndDocumentsFromBody(b);
   return {
-    name: b.name || '',
+    name: typeof b.name === 'string' ? b.name : '',
     email: typeof b.email === 'string' ? b.email.trim() : '',
-    mrn: b.mrn || '',
-    contactPhone: b.contactPhone || '',
-    placeOfLiving: b.placeOfLiving || '',
-    referredBy: b.referredBy || '',
-    dateOfBirth: b.dateOfBirth || '',
+    mrn: typeof b.mrn === 'string' ? b.mrn : '',
+    contactPhone: typeof b.contactPhone === 'string' ? b.contactPhone : '',
+    placeOfLiving: typeof b.placeOfLiving === 'string' ? b.placeOfLiving : '',
+    referredBy: typeof b.referredBy === 'string' ? b.referredBy : '',
+    dateOfBirth: typeof b.dateOfBirth === 'string' ? b.dateOfBirth : '',
     currentAge: parseInt(String(b.currentAge), 10) || 0,
     ageAtDiagnosis: parseInt(String(b.ageAtDiagnosis), 10) || 0,
-    sex: b.sex || '',
-    smokingStatus: b.smokingStatus || '',
+    sex: typeof b.sex === 'string' ? b.sex : '',
+    smokingStatus: typeof b.smokingStatus === 'string' ? b.smokingStatus : '',
     smokingDetails: typeof b.smokingDetails === 'string' ? b.smokingDetails.trim() : '',
-    primaryDiagnosis: b.primaryDiagnosis || '',
-    diseaseDuration: b.diseaseDuration || '',
+    primaryDiagnosis: typeof b.primaryDiagnosis === 'string' ? b.primaryDiagnosis : '',
+    diseaseDuration: typeof b.diseaseDuration === 'string' ? b.diseaseDuration : '',
     perianalDiseaseAssessment:
       typeof b.perianalDiseaseAssessment === 'string' ? b.perianalDiseaseAssessment.trim() : '',
-    montrealClass: b.montrealClass || '',
+    montrealClass: typeof b.montrealClass === 'string' ? b.montrealClass : '',
     previousSurgeries: normalizeJsonArray(b.previousSurgeries),
-    currentDiseaseActivity: b.currentDiseaseActivity || '',
-    stoolFrequency: b.stoolFrequency || '',
-    bloodInStool: b.bloodInStool || '',
-    abdominalPain: b.abdominalPain || '',
-    impactOnQoL: b.impactOnQoL || '',
-    weightLoss: b.weightLoss || '',
-    activityScore: b.activityScore || '',
+    currentDiseaseActivity: typeof b.currentDiseaseActivity === 'string' ? b.currentDiseaseActivity : '',
+    stoolFrequency: typeof b.stoolFrequency === 'string' ? b.stoolFrequency : '',
+    bloodInStool: typeof b.bloodInStool === 'string' ? b.bloodInStool : '',
+    abdominalPain: typeof b.abdominalPain === 'string' ? b.abdominalPain : '',
+    impactOnQoL: typeof b.impactOnQoL === 'string' ? b.impactOnQoL : '',
+    weightLoss: typeof b.weightLoss === 'string' ? b.weightLoss : '',
+    activityScore: typeof b.activityScore === 'string' ? b.activityScore : '',
     dateMostRecentLabs,
-    recentLabValues: b.recentLabValues || '',
-    dateMostRecentColonoscopy: b.dateMostRecentColonoscopy || '',
-    colonoscopyFindings: b.colonoscopyFindings || '',
-    recentImaging: b.recentImaging || '',
-    mostRecentDexaScan: b.mostRecentDexaScan || '',
-    currentIbdMedications: b.currentIbdMedications || '',
-    failedTreatments: b.failedTreatments || '',
-    tdmResults: b.tdmResults || '',
-    currentSupplements: b.currentSupplements || '',
-    responseToTreatment: b.responseToTreatment || '',
-    steroidUse: b.steroidUse || '',
+    recentLabValues: typeof b.recentLabValues === 'string' ? b.recentLabValues : '',
+    dateMostRecentColonoscopy: typeof b.dateMostRecentColonoscopy === 'string' ? b.dateMostRecentColonoscopy : '',
+    colonoscopyFindings: typeof b.colonoscopyFindings === 'string' ? b.colonoscopyFindings : '',
+    recentImaging: typeof b.recentImaging === 'string' ? b.recentImaging : '',
+    mostRecentDexaScan: typeof b.mostRecentDexaScan === 'string' ? b.mostRecentDexaScan : '',
+    currentIbdMedications: typeof b.currentIbdMedications === 'string' ? b.currentIbdMedications : '',
+    failedTreatments: typeof b.failedTreatments === 'string' ? b.failedTreatments : '',
+    tdmResults: typeof b.tdmResults === 'string' ? b.tdmResults : '',
+    currentSupplements: typeof b.currentSupplements === 'string' ? b.currentSupplements : '',
+    responseToTreatment: typeof b.responseToTreatment === 'string' ? b.responseToTreatment : '',
+    steroidUse: typeof b.steroidUse === 'string' ? b.steroidUse : '',
     previousTreatmentsTried: normalizeJsonArray(b.previousTreatmentsTried),
-    tbScreening: b.tbScreening || '',
-    hepBSurfaceAg: b.hepBSurfaceAg || '',
-    hepBSurfaceAb: b.hepBSurfaceAb || '',
-    hepBCoreAb: b.hepBCoreAb || '',
-    antiHcv: b.antiHcv || '',
-    antiHiv: b.antiHiv || '',
+    tbScreening: typeof b.tbScreening === 'string' ? b.tbScreening : '',
+    hepBSurfaceAg: typeof b.hepBSurfaceAg === 'string' ? b.hepBSurfaceAg : '',
+    hepBSurfaceAb: typeof b.hepBSurfaceAb === 'string' ? b.hepBSurfaceAb : '',
+    hepBCoreAb: typeof b.hepBCoreAb === 'string' ? b.hepBCoreAb : '',
+    antiHcv: typeof b.antiHcv === 'string' ? b.antiHcv : '',
+    antiHiv: typeof b.antiHiv === 'string' ? b.antiHiv : '',
     influenza: normalizeJsonObject(b.influenza),
     covid19: normalizeJsonObject(b.covid19),
     pneumococcal: normalizeJsonObject(b.pneumococcal),
@@ -136,10 +138,10 @@ export function patientCreateDataFromBody(body: Record<string, unknown>) {
     tetanusTdap: normalizeJsonObject(b.tetanusTdap),
     comorbidities: normalizeJsonArray(b.comorbidities),
     extraintestinalManif: normalizeExtrinsicManifestations(b.extraintestinalManif),
-    pregnancyPlanning: b.pregnancyPlanning || '',
+    pregnancyPlanning: typeof b.pregnancyPlanning === 'string' ? b.pregnancyPlanning : '',
     preferredLanguage: normalizePreferredLanguage(b.preferredLanguage),
-    occupation: b.occupation || '',
-    specialConsiderations: b.specialConsiderations || '',
+    occupation: typeof b.occupation === 'string' ? b.occupation : '',
+    specialConsiderations: typeof b.specialConsiderations === 'string' ? b.specialConsiderations : '',
     documents: normalizeJsonArray(documents),
   };
 }

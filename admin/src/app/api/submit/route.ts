@@ -1,11 +1,16 @@
 import fs from 'fs';
 import path from 'path';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { patientCreateDataFromBody } from '@/lib/patient-create-data';
+import { getErrorMessage } from '@/lib/get-error-message';
 
-export async function POST(req: Request) {
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const cookieStore = await cookies();
     const userIdCookie = cookieStore.get('userId');
@@ -15,14 +20,17 @@ export async function POST(req: Request) {
     }
 
     const userId = parseInt(userIdCookie.value, 10);
-    const body = await req.json();
+    const raw: unknown = await req.json();
+    if (!isRecord(raw)) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
 
     const created = await prisma.patient.create({
-      data: patientCreateDataFromBody(body),
+      data: patientCreateDataFromBody(raw),
     });
 
     const snapshot = {
-      ...body,
+      ...raw,
       id: created.id,
       userId: Number.isFinite(userId) ? userId : undefined,
       createdAt: created.createdAt.toISOString(),
@@ -30,14 +38,18 @@ export async function POST(req: Request) {
     const filePath = path.join(process.cwd(), 'submissions.json');
     let submissions: unknown[] = [];
     if (fs.existsSync(filePath)) {
-      submissions = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      const parsed: unknown = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      submissions = Array.isArray(parsed) ? parsed : [];
     }
     submissions.push(snapshot);
     fs.writeFileSync(filePath, JSON.stringify(submissions, null, 2));
 
     return NextResponse.json({ success: true, patientId: created.id });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Submission error:', error);
-    return NextResponse.json({ error: 'Failed to submit form: ' + error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to submit form: ' + getErrorMessage(error) },
+      { status: 500 },
+    );
   }
 }

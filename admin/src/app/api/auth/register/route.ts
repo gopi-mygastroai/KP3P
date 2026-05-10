@@ -1,11 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 export const runtime = 'nodejs';
 
-export async function POST(req: Request) {
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const { email, password, name } = await req.json();
+    const raw: unknown = await req.json();
+    if (!isRecord(raw)) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const email = typeof raw.email === 'string' ? raw.email.trim() : '';
+    const password = typeof raw.password === 'string' ? raw.password : '';
+    const name = typeof raw.name === 'string' ? raw.name.trim() : '';
 
     if (!email || !password || !name) {
       return NextResponse.json({ error: 'Name, Email, and password are required' }, { status: 400 });
@@ -14,7 +24,7 @@ export async function POST(req: Request) {
     const role = email === 'admin@mygastro.ai' ? 'ADMIN' : 'PATIENT';
 
     const user = {
-      id: Math.floor(Math.random() * 1000000), // Fake ID
+      id: Math.floor(Math.random() * 1000000),
       email,
       name,
       role,
@@ -27,7 +37,7 @@ export async function POST(req: Request) {
       maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
-    
+
     cookieStore.set('userRole', user.role, {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',

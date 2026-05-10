@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { initialFormData, FormData } from './formData';
+import { getErrorMessage } from '@/lib/get-error-message';
 import { Step1, Step2, Step3 } from './StepComponents';
 
 export default function MultiStepForm() {
@@ -17,16 +18,18 @@ export default function MultiStepForm() {
 
   // Load from local storage
   useEffect(() => {
-    const saved = localStorage.getItem('mygastro_form_draft');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setFormData({ ...initialFormData, ...parsed });
-      } catch (e) {
-        console.error('Failed to parse draft');
+    queueMicrotask(() => {
+      const saved = localStorage.getItem('mygastro_form_draft');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setFormData({ ...initialFormData, ...parsed });
+        } catch (e) {
+          console.error('Failed to parse draft');
+        }
       }
-    }
-    setIsLoaded(true);
+      setIsLoaded(true);
+    });
   }, []);
 
   // Save to local storage
@@ -127,8 +130,8 @@ export default function MultiStepForm() {
 
       localStorage.removeItem('mygastro_form_draft');
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }

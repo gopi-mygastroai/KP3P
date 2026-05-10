@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getErrorMessage } from '@/lib/get-error-message';
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
@@ -39,8 +40,8 @@ export default function AuthForm() {
 
       const role = data.user?.role;
       window.location.href = role === 'ADMIN' ? '/admin' : '/form';
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

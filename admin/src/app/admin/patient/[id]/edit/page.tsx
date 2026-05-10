@@ -3,7 +3,7 @@ import PatientEditForm from '@/components/PatientEditForm';
 import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 
-export default async function PatientEditPage({ params }: { params: any }) {
+export default async function PatientEditPage({ params }: { params: Promise<{ id: string }> }) {
   const cookieStore = await cookies();
   const userRole = cookieStore.get('userRole');
   
