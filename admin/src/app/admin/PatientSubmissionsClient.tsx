@@ -15,6 +15,7 @@ export type PatientRow = {
   primaryDiagnosis: string;
   currentDiseaseActivity: string;
   currentAge: number;
+  assessmentComplete: boolean;
 };
 
 const activityStyles: Record<string, { color: string; bg: string; border: string }> = {
@@ -158,19 +159,24 @@ export default function PatientSubmissionsClient({ patients }: { patients: Patie
                       </td>
                       <td className="td-age">{p.currentAge ? `${p.currentAge} yrs` : '—'}</td>
                       <td className="td-view">
-                        <a href={`/admin/patient/${p.id}`} style={{ marginRight: '8px' }}>
+                        <a
+                          href={`/admin/patient/${p.id}`}
+                          style={p.assessmentComplete ? undefined : { marginRight: '8px' }}
+                        >
                           View details
                         </a>
-                        <a
-                          href={`/admin/patient/${p.id}/assessment`}
-                          style={{
-                            background: 'rgba(13,148,136,0.08)',
-                            borderColor: 'rgba(13,148,136,0.25)',
-                            color: '#0d9488',
-                          }}
-                        >
-                          Assessment
-                        </a>
+                        {!p.assessmentComplete && (
+                          <a
+                            href={`/admin/patient/${p.id}/assessment`}
+                            style={{
+                              background: 'rgba(13,148,136,0.08)',
+                              borderColor: 'rgba(13,148,136,0.25)',
+                              color: '#0d9488',
+                            }}
+                          >
+                            Assessment
+                          </a>
+                        )}
                       </td>
                     </tr>
                   );
@@ -222,9 +228,11 @@ export default function PatientSubmissionsClient({ patients }: { patients: Patie
                   </div>
                   <div className="ad-mobile-card-actions">
                     <a href={`/admin/patient/${p.id}`}>View details</a>
-                    <a href={`/admin/patient/${p.id}/assessment`} className="ad-mca-primary">
-                      Assessment
-                    </a>
+                    {!p.assessmentComplete && (
+                      <a href={`/admin/patient/${p.id}/assessment`} className="ad-mca-primary">
+                        Assessment
+                      </a>
+                    )}
                   </div>
                 </article>
               );

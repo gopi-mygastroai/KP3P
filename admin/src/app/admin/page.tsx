@@ -33,6 +33,7 @@ export default async function AdminPage() {
     primaryDiagnosis: p.primaryDiagnosis,
     currentDiseaseActivity: p.currentDiseaseActivity,
     currentAge: p.currentAge,
+    assessmentComplete: p.assessmentComplete === true,
   }));
 
   return (

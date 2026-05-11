@@ -7,6 +7,21 @@ import html2canvas from 'html2canvas';
 const DEFAULT_CARESHEET_FAILURE =
   'Care sheet generation failed. Please try again or contact support.';
 
+/** Injected into preview + off-screen PDF hosts so html2canvas always has rules (modal may unmount). */
+const KP3P_PREVIEW_STYLES = `
+  .kp3p-preview { outline: none; }
+  .kp3p-preview:focus { box-shadow: inset 0 0 0 2px rgba(59,130,246,0.3); border-radius: 4px; }
+  .kp3p-preview h2 { color: #1e3a8a; font-size: 24px; border-bottom: 2px solid #1e3a8a; padding-bottom: 8px; }
+  .kp3p-preview h3 { color: #2563eb; font-size: 18px; margin-top: 24px; }
+  .kp3p-preview h4 { color: #3b82f6; font-size: 16px; margin-top: 20px; }
+  .kp3p-preview h5 { color: #475569; font-size: 14px; margin-top: 16px; text-transform: uppercase; }
+  .kp3p-preview table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  .kp3p-preview th, .kp3p-preview td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+  .kp3p-preview th { background-color: #f1f5f9; font-weight: bold; color: #1e293b; }
+  .kp3p-preview b { font-weight: 700; color: #0f172a; }
+  .kp3p-preview p { margin-bottom: 12px; }
+`;
+
 function isAbortError(e: unknown): boolean {
   return (
     (e instanceof DOMException && e.name === 'AbortError') ||
@@ -22,6 +37,78 @@ async function readJsonSafe(res: Response): Promise<Record<string, unknown>> {
       : {};
   } catch {
     return {};
+  }
+}
+
+function safeFileSegment(name: string): string {
+  const s = name.replace(/[/\\?%*:|"<>]/g, '_').trim();
+  return s || 'Patient';
+}
+
+/** Split KP-3P preview DOM into Part 1 (physician) vs Part 2 (patient) using the Part 2 heading. */
+function getKp3pPartSections(
+  previewRoot: HTMLElement,
+): { part1: HTMLElement[]; part2: HTMLElement[] } | null {
+  const h3Part2 = [...previewRoot.querySelectorAll('h3')].find((h) => {
+    const t = (h.textContent ?? '').replace(/\s+/g, ' ').trim();
+    return /PART\s*2/i.test(t) && /PATIENT/i.test(t) && /CARE\s*PLAN/i.test(t);
+  });
+  if (!h3Part2) return null;
+
+  let startPart2: Element = h3Part2;
+  const prev = h3Part2.previousElementSibling;
+  if (prev?.tagName === 'H2') startPart2 = prev;
+
+  let boundary: Element | null = startPart2;
+  while (boundary && boundary.parentElement !== previewRoot) {
+    boundary = boundary.parentElement;
+  }
+  if (!boundary) return null;
+
+  const topLevel = [...previewRoot.children] as HTMLElement[];
+  const idx2 = topLevel.indexOf(boundary as HTMLElement);
+  if (idx2 < 0) return null;
+
+  return {
+    part1: topLevel.slice(0, idx2),
+    part2: topLevel.slice(idx2),
+  };
+}
+
+async function htmlHostToPdf(host: HTMLElement, fileName: string): Promise<void> {
+  const originalHeight = host.style.height;
+  const originalOverflow = host.style.overflow;
+  host.style.height = 'auto';
+  host.style.overflow = 'visible';
+  try {
+    const canvas = await html2canvas(host, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    let heightLeft = pdfHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+    heightLeft -= pdf.internal.pageSize.getHeight();
+
+    while (heightLeft >= 0) {
+      position = heightLeft - pdfHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pdf.internal.pageSize.getHeight();
+    }
+
+    pdf.save(fileName);
+  } finally {
+    host.style.height = originalHeight;
+    host.style.overflow = originalOverflow;
   }
 }
 
@@ -98,37 +185,74 @@ export function CaresheetButton({
     setLoadingPhase('pdf');
     setStatus('loading');
     setBannerError(null);
+
+    const outer = previewRef.current;
+    const editable = outer.querySelector<HTMLElement>('.kp3p-preview');
+    if (!editable) {
+      setBannerError('PDF download failed. Please try again.');
+      setStatus('preview');
+      setLoadingPhase('none');
+      return;
+    }
+
+    const baseName = safeFileSegment(patient.name);
+    const widthPx = Math.max(outer.clientWidth, 640);
+
+    const buildHost = (sectionNodes: HTMLElement[]): HTMLDivElement => {
+      const host = document.createElement('div');
+      // Must stay fully opaque: html2canvas often renders opacity:0 as a blank bitmap.
+      Object.assign(host.style, {
+        position: 'fixed',
+        left: '-12000px',
+        top: '0',
+        width: `${widthPx}px`,
+        boxSizing: 'border-box',
+        backgroundColor: '#fff',
+        padding: '40px',
+        fontFamily: 'Arial, sans-serif',
+        color: '#333',
+        lineHeight: '1.6',
+        zIndex: '2147483646',
+        opacity: '1',
+        pointerEvents: 'none',
+        overflow: 'visible',
+      });
+      const styleEl = document.createElement('style');
+      styleEl.textContent = KP3P_PREVIEW_STYLES;
+      host.appendChild(styleEl);
+      const inner = document.createElement('div');
+      inner.className = 'kp3p-preview';
+      for (const node of sectionNodes) {
+        inner.appendChild(node.cloneNode(true));
+      }
+      host.appendChild(inner);
+      document.body.appendChild(host);
+      return host;
+    };
+
     try {
-      const el = previewRef.current;
-      const originalHeight = el.style.height;
-      const originalOverflow = el.style.overflow;
-      el.style.height = 'auto';
-      el.style.overflow = 'visible';
-
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true });
-
-      el.style.height = originalHeight;
-      el.style.overflow = originalOverflow;
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      let heightLeft = pdfHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-      heightLeft -= pdf.internal.pageSize.getHeight();
-
-      while (heightLeft >= 0) {
-        position = heightLeft - pdfHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-        heightLeft -= pdf.internal.pageSize.getHeight();
+      const sections = getKp3pPartSections(editable);
+      if (!sections || sections.part1.length === 0 || sections.part2.length === 0) {
+        setBannerError(
+          'Could not split into Part 1 and Part 2. Keep the “PART 2: PATIENT CARE PLAN” heading, then try again.',
+        );
+        setStatus('preview');
+        return;
       }
 
-      pdf.save(`KP3P_${patient.name}.pdf`);
+      const host1 = buildHost(sections.part1);
+      const host2 = buildHost(sections.part2);
+      try {
+        await htmlHostToPdf(
+          host1,
+          `KP3P_${baseName}_PART1_Clinical_Protocol_Physician_Record.pdf`,
+        );
+        await htmlHostToPdf(host2, `KP3P_${baseName}_PART2_Patient_Care_Plan.pdf`);
+      } finally {
+        host1.remove();
+        host2.remove();
+      }
+
       setStatus('idle');
     } catch {
       setBannerError('PDF download failed. Please try again.');
@@ -137,6 +261,10 @@ export function CaresheetButton({
       setLoadingPhase('none');
     }
   };
+
+  const showPreviewModal =
+    status === 'preview' || (status === 'loading' && loadingPhase === 'pdf');
+  const pdfCaptureBusy = status === 'loading' && loadingPhase === 'pdf';
 
   return (
     <>
@@ -210,7 +338,7 @@ export function CaresheetButton({
           }}
         >
           {status === 'loading' && loadingPhase === 'pdf'
-            ? '⏳ Building PDF…'
+            ? '⏳ Building PDFs…'
             : status === 'loading'
               ? '⏳ Generating…'
               : label || '📋 Generate KP-3P Care Sheet'}
@@ -236,7 +364,7 @@ export function CaresheetButton({
         )}
       </div>
 
-      {status === 'preview' && (
+      {showPreviewModal && (
         <div
           style={{
             position: 'fixed',
@@ -262,8 +390,29 @@ export function CaresheetButton({
               display: 'flex',
               flexDirection: 'column',
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+              position: 'relative',
             }}
           >
+            {pdfCaptureBusy && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 10,
+                  backgroundColor: 'rgba(255,255,255,0.85)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '12px',
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  fontFamily: 'Inter, sans-serif',
+                }}
+              >
+                ⏳ Building PDFs…
+              </div>
+            )}
             <div
               style={{
                 padding: '20px',
@@ -277,7 +426,10 @@ export function CaresheetButton({
                 Preview Caresheet
               </h2>
               <button
+                type="button"
+                disabled={pdfCaptureBusy}
                 onClick={() => {
+                  if (pdfCaptureBusy) return;
                   setStatus('idle');
                   dismissBanner();
                 }}
@@ -285,8 +437,9 @@ export function CaresheetButton({
                   background: 'none',
                   border: 'none',
                   fontSize: '24px',
-                  cursor: 'pointer',
+                  cursor: pdfCaptureBusy ? 'not-allowed' : 'pointer',
                   color: '#64748b',
+                  opacity: pdfCaptureBusy ? 0.4 : 1,
                 }}
               >
                 &times;
@@ -325,23 +478,7 @@ export function CaresheetButton({
                   lineHeight: 1.6,
                 }}
               >
-                <style
-                  dangerouslySetInnerHTML={{
-                    __html: `
-                  .kp3p-preview { outline: none; }
-                  .kp3p-preview:focus { box-shadow: inset 0 0 0 2px rgba(59,130,246,0.3); border-radius: 4px; }
-                  .kp3p-preview h2 { color: #1e3a8a; font-size: 24px; border-bottom: 2px solid #1e3a8a; padding-bottom: 8px; }
-                  .kp3p-preview h3 { color: #2563eb; font-size: 18px; margin-top: 24px; }
-                  .kp3p-preview h4 { color: #3b82f6; font-size: 16px; margin-top: 20px; }
-                  .kp3p-preview h5 { color: #475569; font-size: 14px; margin-top: 16px; text-transform: uppercase; }
-                  .kp3p-preview table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
-                  .kp3p-preview th, .kp3p-preview td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
-                  .kp3p-preview th { background-color: #f1f5f9; font-weight: bold; color: #1e293b; }
-                  .kp3p-preview b { font-weight: 700; color: #0f172a; }
-                  .kp3p-preview p { margin-bottom: 12px; }
-                `,
-                  }}
-                />
+                <style dangerouslySetInnerHTML={{ __html: KP3P_PREVIEW_STYLES }} />
                 <div
                   className="kp3p-preview"
                   contentEditable={true}
@@ -361,7 +498,10 @@ export function CaresheetButton({
               }}
             >
               <button
+                type="button"
+                disabled={pdfCaptureBusy}
                 onClick={() => {
+                  if (pdfCaptureBusy) return;
                   setStatus('idle');
                   dismissBanner();
                 }}
@@ -371,13 +511,16 @@ export function CaresheetButton({
                   border: '1px solid #cbd5e1',
                   background: '#fff',
                   color: '#475569',
-                  cursor: 'pointer',
+                  cursor: pdfCaptureBusy ? 'not-allowed' : 'pointer',
                   fontWeight: 600,
+                  opacity: pdfCaptureBusy ? 0.6 : 1,
                 }}
               >
                 Cancel
               </button>
               <button
+                type="button"
+                disabled={status === 'loading'}
                 onClick={downloadPdf}
                 style={{
                   padding: '10px 20px',
@@ -385,11 +528,11 @@ export function CaresheetButton({
                   border: 'none',
                   background: '#2563eb',
                   color: '#fff',
-                  cursor: 'pointer',
+                  cursor: status === 'loading' ? 'wait' : 'pointer',
                   fontWeight: 600,
                 }}
               >
-                Confirm & Download PDF
+                Confirm & Download PDFs
               </button>
             </div>
           </div>
