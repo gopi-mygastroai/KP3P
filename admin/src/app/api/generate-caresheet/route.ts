@@ -109,7 +109,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: USER_FRIENDLY_502 }, { status: 502 });
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
     console.log(
       `[KP3P] Sending request to Gemini — patient: ${patientIdForLog}, PDF size: ${guidelinePdfSizeBytes} bytes`,
@@ -193,7 +193,7 @@ OUTPUT RULES
       ],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 32000,
+        maxOutputTokens: 8192,
       },
     };
 

@@ -5,7 +5,7 @@ When a user clicks **"Download KP-3P Care Sheet"**, this is what happens:
 1. The button switches to a loading state (`Generating...`).
 2. The app collects the selected patient's assessment data and formats it for KP-3P generation.
 3. It sends that data to the backend API endpoint: `/api/generate-caresheet`.
-4. The backend builds a KP-3P prompt and sends it to Gemini (`gemini-2.5-flash`) using `GEMINI_API_KEY`.
+4. The backend builds a KP-3P prompt and sends it to Gemini (`gemini-2.0-flash`) using `GEMINI_API_KEY`.
 5. Gemini returns generated care-sheet HTML content.
 6. The frontend opens a full-screen **Preview Caresheet** modal.
 7. The generated document is shown in **editable mode** (user can click and edit text).
