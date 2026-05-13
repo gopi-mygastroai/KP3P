@@ -193,7 +193,7 @@ OUTPUT RULES
       ],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 32000,
       },
     };
 
