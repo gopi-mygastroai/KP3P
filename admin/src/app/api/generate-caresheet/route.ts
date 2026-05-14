@@ -65,7 +65,7 @@ OUTPUT RULES
 - Generate BOTH parts: the Clinical Protocol AND the Patient Care Plan.
 - Total target length: 5–6 pages clinical protocol + 2–3 pages patient care plan.`;
 
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -104,21 +104,6 @@ function httpStatusFromUnknown(err: unknown): number | undefined {
     return typeof s === 'number' ? s : undefined;
   }
   return undefined;
-}
-
-function extractFirstTextFromClaudeContent(
-  content: Anthropic.Messages.ContentBlock[],
-): string {
-  const first = content[0];
-  if (first && first.type === 'text' && 'text' in first && typeof first.text === 'string') {
-    return first.text;
-  }
-  for (const block of content) {
-    if (block.type === 'text' && 'text' in block && typeof block.text === 'string') {
-      return block.text;
-    }
-  }
-  return '';
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -179,7 +164,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const anthropic = new Anthropic({ apiKey });
 
     console.log(
-      `[KP3P] Sending request to Claude — patient: ${patientIdForLog}, PDF size: ${guidelinePdfSizeBytes} bytes`,
+      `[KP3P] Sending streaming request to Claude (${CLAUDE_MODEL}) — patient: ${patientIdForLog}, PDF size: ${guidelinePdfSizeBytes} bytes`,
     );
 
     /** Same ordering as Gemini: PDF inline_data first, then patient `prompt` text. */
@@ -201,9 +186,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       userContent[0].source.media_type === 'application/pdf';
     console.log('[KP3P] Claude request user message includes PDF document part:', hasPdfDocument);
 
-    let response: Anthropic.Messages.Message;
+    let modelOutput: string;
     try {
-      response = await anthropic.messages.create(
+      const stream = anthropic.messages.stream(
         {
           model: CLAUDE_MODEL,
           max_tokens: 32000,
@@ -213,6 +198,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         },
         { signal: req.signal },
       );
+      modelOutput = await stream.finalText();
     } catch (callErr: unknown) {
       if (isLikelyAbortError(callErr)) {
         logCaresheetFailure(patientIdForLog, 'claude_request_aborted', callErr);
@@ -229,11 +215,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           { status: 429 },
         );
       }
-      logCaresheetFailure(patientIdForLog, 'claude_messages_create_threw', callErr);
+      logCaresheetFailure(patientIdForLog, 'claude_messages_stream_threw', callErr);
       return NextResponse.json({ error: USER_FRIENDLY_502 }, { status: 502 });
     }
 
-    const modelOutput = extractFirstTextFromClaudeContent(response.content);
     if (!modelOutput.trim() || modelOutput.length < 100) {
       logCaresheetFailure(patientIdForLog, 'claude_empty_or_short_content', new Error('content_too_short'), {
         contentLength: modelOutput.length,
