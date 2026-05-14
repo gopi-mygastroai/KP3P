@@ -56,7 +56,7 @@ Run the **admin** app first so intake API calls (`/api/patients`, `/api/drive/up
 
 Details and comments live in each app’s template files:
 
-- **Admin:** [`admin/.env.example`](admin/.env.example) — database URL (`POSTGRES_PRISMA_URL`), `GEMINI_API_KEY` for care sheet generation, optional Google Drive OAuth fields, script-only keys for OpenRouter tests.
+- **Admin:** [`admin/.env.example`](admin/.env.example) — database URL (`POSTGRES_PRISMA_URL`), `ANTHROPIC_API_KEY` for care sheet generation, optional Google Drive OAuth fields, script-only keys for OpenRouter tests.
 - **Intake:** [`Patient-intake-form/.env.example`](Patient-intake-form/.env.example) — `NEXT_PUBLIC_API_URL` (base URL of the admin app).
 
 Never commit real `.env` or `.env.local` files; only the `*.example` templates belong in Git.
@@ -78,7 +78,7 @@ See [`admin/package.json`](admin/package.json) for additional script entries (e.
 
 - [Next.js](https://nextjs.org/) (App Router), React, TypeScript (intake) / JS config (admin)
 - [Prisma](https://www.prisma.io/) + PostgreSQL (admin)
-- Optional: Google Gemini, Google Drive API (admin)
+- Optional: Anthropic Claude, Google Drive API (admin)
 
 ## Contributing
 

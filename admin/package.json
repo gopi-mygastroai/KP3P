@@ -13,6 +13,7 @@
     "test:generate-care-sheet": "node scripts/test-generate-care-sheet.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.96.0",
     "@prisma/client": "5.22.0",
     "docx": "^9.6.1",
     "file-saver": "^2.0.5",
