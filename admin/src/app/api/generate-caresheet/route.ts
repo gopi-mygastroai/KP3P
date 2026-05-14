@@ -132,19 +132,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     };
     const prompt = buildKP3PPrompt(patientForPrompt);
 
-    const guidelinePdfPath = path.join(process.cwd(), 'medical-doc', 'IBD-Guidelines.pdf');
-    let guidelinePdfBase64: string;
-    let guidelinePdfSizeBytes: number;
+    const guidelineTxtPath = path.join(process.cwd(), 'medical-doc', 'IBD-Guidelines.txt');
+    let guidelineText: string;
+    let guidelineFileSizeBytes: number;
     try {
-      const guidelinePdfBuffer = fs.readFileSync(guidelinePdfPath);
-      guidelinePdfSizeBytes = guidelinePdfBuffer.length;
-      guidelinePdfBase64 = guidelinePdfBuffer.toString('base64');
+      const guidelineBuffer = fs.readFileSync(guidelineTxtPath);
+      guidelineFileSizeBytes = guidelineBuffer.length;
+      guidelineText = guidelineBuffer.toString('utf8');
     } catch (err) {
-      console.error('Failed to load guideline PDF:', err);
+      console.error('Failed to load guideline text file:', err);
       return NextResponse.json(
         {
           error:
-            'Guideline PDF not found. Please ensure IBD-Guidelines.pdf is present in the medical-doc directory.',
+            'Guideline text file not found. Please ensure IBD-Guidelines.txt is present in the medical-doc directory.',
         },
         { status: 500 },
       );
@@ -164,27 +164,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const anthropic = new Anthropic({ apiKey });
 
     console.log(
-      `[KP3P] Sending streaming request to Claude (${CLAUDE_MODEL}) — patient: ${patientIdForLog}, PDF size: ${guidelinePdfSizeBytes} bytes`,
+      `[KP3P] Sending streaming request to Claude (${CLAUDE_MODEL}) — patient: ${patientIdForLog}, guideline text file size: ${guidelineFileSizeBytes} bytes`,
     );
 
-    /** Same ordering as Gemini: PDF inline_data first, then patient `prompt` text. */
+    /** Guideline extracted text first, then patient `prompt` text (same ordering as when PDF was sent first). */
     const userContent: Anthropic.Messages.ContentBlockParam[] = [
-      {
-        type: 'document',
-        source: {
-          type: 'base64',
-          media_type: 'application/pdf',
-          data: guidelinePdfBase64,
-        },
-      },
+      { type: 'text', text: guidelineText },
       { type: 'text', text: prompt },
     ];
 
-    const hasPdfDocument =
-      userContent[0]?.type === 'document' &&
-      userContent[0].source.type === 'base64' &&
-      userContent[0].source.media_type === 'application/pdf';
-    console.log('[KP3P] Claude request user message includes PDF document part:', hasPdfDocument);
+    const hasGuidelineTextBlock = userContent[0]?.type === 'text';
+    console.log('[KP3P] Claude request user message includes guideline text block:', hasGuidelineTextBlock);
 
     let modelOutput: string;
     try {
