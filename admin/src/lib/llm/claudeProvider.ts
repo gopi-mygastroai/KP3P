@@ -46,8 +46,7 @@ class ClaudeProvider implements LLMProvider {
         hasGuidelineTextBlock,
       );
 
-      // TODO: restore anthropic.messages.stream + finalText() for lower time-to-first-token on long care sheets.
-      const response = await anthropic.messages.create(
+      const stream = anthropic.messages.stream(
         {
           model: CLAUDE_MODEL,
           max_tokens: ctx.maxTokens ?? MAX_TOKENS,
@@ -58,10 +57,12 @@ class ClaudeProvider implements LLMProvider {
         ctx.signal ? { signal: ctx.signal } : undefined,
       );
 
-      return response.content
+      const message = await stream.finalMessage();
+      const text = message.content
         .filter((block): block is Anthropic.TextBlock => block.type === 'text')
         .map((block) => block.text)
         .join('');
+      return text;
     } catch (err: unknown) {
       if (err instanceof LLMConfigurationError) {
         throw err;

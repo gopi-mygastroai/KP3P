@@ -53,15 +53,16 @@ class GeminiProvider implements LLMProvider {
         hasGuidelineTextBlock,
       );
 
+      const request = {
+        contents: [{ role: 'user' as const, parts: userParts }],
+      };
       const requestOptions = ctx.signal ? { signal: ctx.signal } : undefined;
-      const result = await model.generateContent(
-        {
-          contents: [{ role: 'user', parts: userParts }],
-        },
-        requestOptions,
-      );
+      const result = await model.generateContentStream(request, requestOptions);
 
-      const text = result.response.text();
+      let text = '';
+      for await (const chunk of result.stream) {
+        text += chunk.text();
+      }
       if (!text) {
         throw new Error('empty response from model');
       }

@@ -6,7 +6,7 @@ import { buildKP3PPrompt, type PatientData } from '@/lib/kp3p-prompt';
 import llmProvider from '@/lib/llm';
 import { LLMConfigurationError } from '@/lib/llm/llmProvider';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const USER_FRIENDLY_502 =
   'Care sheet generation failed. Please try again or contact support.';
@@ -109,7 +109,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       estimatedInputTokens: payloadStats.estimatedTotalTokens,
     });
 
-    // TODO: stream model output to the client (previously anthropic.messages.stream on Claude).
     let result: string;
     try {
       result = await llmProvider.generateCarePlan(prompt, {
