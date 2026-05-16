@@ -1,71 +1,16 @@
-import fs from 'fs';
-import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { CARE_SHEET_SYSTEM_PROMPT } from '@/lib/care-sheet-system-prompt';
+import { loadIbdRulebookText } from '@/lib/load-ibd-rulebook';
+import { breakdownCareSheetPayload, estimateTokensFromText } from '@/lib/llm-payload-stats';
 import { buildKP3PPrompt, type PatientData } from '@/lib/kp3p-prompt';
+import llmProvider from '@/lib/llm';
+import { LLMConfigurationError } from '@/lib/llm/llmProvider';
 
 export const maxDuration = 60;
 
 const USER_FRIENDLY_502 =
   'Care sheet generation failed. Please try again or contact support.';
 const MODEL_FORMAT_502 = 'The model returned an unexpected response format.';
-
-/** Same system text previously sent as Gemini `systemInstruction.parts[0].text`. */
-const SYSTEM_PROMPT = `You are an expert AI clinical decision support system for Inflammatory Bowel Disease
-(IBD) management, following STRIDE-II consensus, ECCO, ACG, and the guideline
-document provided in this conversation.
-
-YOUR MISSION
-When given patient characteristics, generate a comprehensive, personalized treatment
-and monitoring plan using the KP-3P framework:
-  K  = Know Your Patient
-  P1 = Predict Risk Behavior
-  P2 = Prevent Opportunistic Infections
-  P3 = Protect from Disease & Drug-Related Side Effects
-
-RECURSIVE REASONING PROTOCOL
-You MUST use multi-step recursive reasoning. Do not give a single-pass answer.
-
-ITERATION 1 — INITIAL ASSESSMENT (Know Your Patient)
-Assess: diagnosis, Montreal classification, severity (clinical + endoscopic +
-biochemical), initial risk stratification (age at diagnosis, disease extent, behavior,
-deep ulcerations, perianal disease, early steroid use, smoking, prior surgery, EIMs,
-low albumin/anemia), initial treatment strategy, initial infection/vaccine screening
-plan, and initial monitoring plan. Reference the uploaded guideline document.
-
-ITERATION 2 — SELF-CRITIQUE & GUIDELINE VERIFICATION
-Critically review Iteration 1 against the uploaded guideline. Check:
-- Are treatment recommendations consistent with the uploaded guidelines?
-- Are STRIDE-II targets specified with CLEAR timelines?
-- Is TB screening verified BEFORE immunosuppression?
-- Is Hepatitis B status complete?
-- Are live vaccines confirmed before immunosuppression (≥4 weeks)?
-- Is biologic class selection justified?
-- Are high-risk patients getting appropriately aggressive therapy?
-Document what was corrected.
-
-ITERATION 3 — REFINED FINAL RECOMMENDATIONS
-Produce final, evidence-based recommendations for:
-  P1: Risk stratification (LOW/MODERATE/HIGH) with evidence basis
-  P2: Infection prevention — screening checklist + vaccination schedule
-  P3: Treatment plan with STRIDE-II treat-to-target table, monitoring schedule,
-      TDM protocol, cancer surveillance
-
-ITERATION 4 — FINAL QUALITY CHECK
-Verify: all KP-3P components addressed, STRIDE-II targets specified, infection
-screening complete, monitoring in place, no immunosuppression before screening,
-no live vaccines after immunosuppression starts.
-
-OUTPUT RULES
-- Output ONLY pure HTML. No markdown fences.
-- Use only: <h2> <h3> <h4> <h5> <table> <tr> <th> <td> <ul> <li> <b> <p> <br>
-- No custom CSS or inline styles.
-- Replace all [PLACEHOLDERS] with specific clinical data from the patient record.
-- Output in English only.
-- Generate BOTH parts: the Clinical Protocol AND the Patient Care Plan.
-- Total target length: 5–6 pages clinical protocol + 2–3 pages patient care plan.`;
-
-const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -99,6 +44,10 @@ function isLikelyAbortError(err: unknown): boolean {
 }
 
 function httpStatusFromUnknown(err: unknown): number | undefined {
+  if (err && typeof err === 'object' && 'cause' in err) {
+    const fromCause = httpStatusFromUnknown((err as { cause: unknown }).cause);
+    if (fromCause !== undefined) return fromCause;
+  }
   if (err && typeof err === 'object' && 'status' in err) {
     const s = (err as { status: unknown }).status;
     return typeof s === 'number' ? s : undefined;
@@ -132,64 +81,52 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     };
     const prompt = buildKP3PPrompt(patientForPrompt);
 
-    const guidelineTxtPath = path.join(process.cwd(), 'medical-doc', 'IBD-Guidelines.txt');
-    let guidelineText: string;
-    let guidelineFileSizeBytes: number;
+    let rulebookText: string;
     try {
-      const guidelineBuffer = fs.readFileSync(guidelineTxtPath);
-      guidelineFileSizeBytes = guidelineBuffer.length;
-      guidelineText = guidelineBuffer.toString('utf8');
+      rulebookText = await loadIbdRulebookText();
     } catch (err) {
-      console.error('Failed to load guideline text file:', err);
+      console.error('Failed to load IBD clinical rulebook PDF:', err);
       return NextResponse.json(
         {
           error:
-            'Guideline text file not found. Please ensure IBD-Guidelines.txt is present in the medical-doc directory.',
+            'Clinical rulebook not found. Please ensure IBD_Clinical_Rulebook_Final.pdf is present in the medical-doc directory.',
         },
         { status: 500 },
       );
     }
 
-    // process.env.GEMINI_API_KEY;
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      logCaresheetFailure(
-        patientIdForLog,
-        'missing_anthropic_api_key',
-        new Error('ANTHROPIC_API_KEY not configured'),
-      );
-      return NextResponse.json({ error: USER_FRIENDLY_502 }, { status: 502 });
-    }
-
-    const anthropic = new Anthropic({ apiKey });
-
-    console.log(
-      `[KP3P] Sending streaming request to Claude (${CLAUDE_MODEL}) — patient: ${patientIdForLog}, guideline text file size: ${guidelineFileSizeBytes} bytes`,
+    const payloadStats = breakdownCareSheetPayload(
+      CARE_SHEET_SYSTEM_PROMPT,
+      rulebookText,
+      prompt,
     );
+    console.log('[KP3P] LLM input payload', {
+      patientId: patientIdForLog,
+      systemPromptChars: payloadStats.systemPromptChars,
+      rulebookChars: payloadStats.rulebookChars,
+      patientPromptChars: payloadStats.patientPromptChars,
+      totalChars: payloadStats.totalChars,
+      estimatedInputTokens: payloadStats.estimatedTotalTokens,
+    });
 
-    /** Guideline extracted text first, then patient `prompt` text (same ordering as when PDF was sent first). */
-    const userContent: Anthropic.Messages.ContentBlockParam[] = [
-      { type: 'text', text: guidelineText },
-      { type: 'text', text: prompt },
-    ];
-
-    const hasGuidelineTextBlock = userContent[0]?.type === 'text';
-    console.log('[KP3P] Claude request user message includes guideline text block:', hasGuidelineTextBlock);
-
-    let modelOutput: string;
+    // TODO: stream model output to the client (previously anthropic.messages.stream on Claude).
+    let result: string;
     try {
-      const stream = anthropic.messages.stream(
-        {
-          model: CLAUDE_MODEL,
-          max_tokens: 32000,
-          temperature: 0.1,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: userContent }],
-        },
-        { signal: req.signal },
-      );
-      modelOutput = await stream.finalText();
+      result = await llmProvider.generateCarePlan(prompt, {
+        guidelineText: rulebookText,
+        systemPrompt: CARE_SHEET_SYSTEM_PROMPT,
+        signal: req.signal,
+        patientIdForLog,
+      });
     } catch (callErr: unknown) {
+      if (callErr instanceof LLMConfigurationError) {
+        logCaresheetFailure(
+          patientIdForLog,
+          'missing_anthropic_api_key',
+          callErr,
+        );
+        return NextResponse.json({ error: USER_FRIENDLY_502 }, { status: 502 });
+      }
       if (isLikelyAbortError(callErr)) {
         logCaresheetFailure(patientIdForLog, 'claude_request_aborted', callErr);
         return new NextResponse(null, { status: 499 });
@@ -209,14 +146,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: USER_FRIENDLY_502 }, { status: 502 });
     }
 
-    if (!modelOutput.trim() || modelOutput.length < 100) {
+    if (!result.trim() || result.length < 100) {
       logCaresheetFailure(patientIdForLog, 'claude_empty_or_short_content', new Error('content_too_short'), {
-        contentLength: modelOutput.length,
+        contentLength: result.length,
       });
       return NextResponse.json({ error: MODEL_FORMAT_502 }, { status: 502 });
     }
 
-    return NextResponse.json({ htmlContent: modelOutput }, { status: 200 });
+    console.log('[KP3P] LLM output payload', {
+      patientId: patientIdForLog,
+      outputChars: result.length,
+      estimatedOutputTokens: estimateTokensFromText(result),
+    });
+
+    return NextResponse.json({ htmlContent: result }, { status: 200 });
   } catch (err: unknown) {
     logCaresheetFailure(patientIdForLog, 'generate_caresheet_unhandled', err);
     return NextResponse.json({ error: USER_FRIENDLY_502 }, { status: 502 });

@@ -98,6 +98,8 @@ temp/
 
 # --- Local medical literature & prompt exports (do not push) ---
 medical-lit/
+# Extracted rulebook cache (regenerate: npm run seed:rulebook-text)
+admin/medical-doc/IBD_Clinical_Rulebook_Final.txt
 
 # --- Markdown (commit README.md only; not agent notes, prompt exports, or local docs) ---
 **/*.md

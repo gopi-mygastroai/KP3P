@@ -10,10 +10,14 @@
     "lint": "eslint",
     "test:openrouter": "node scripts/test-openrouter.mjs",
     "seed:care-sheet-prompt": "node scripts/seed-care-sheet-prompt.mjs",
-    "test:generate-care-sheet": "node scripts/test-generate-care-sheet.mjs"
+    "test:generate-care-sheet": "node scripts/test-generate-care-sheet.mjs",
+    "test:llm": "ts-node -P tsconfig.scripts.json scripts/testLLM.ts",
+    "count:llm-tokens": "ts-node -P tsconfig.scripts.json scripts/countLLMPayloadTokens.ts",
+    "seed:rulebook-text": "ts-node -P tsconfig.scripts.json scripts/seedRulebookText.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "5.22.0",
     "docx": "^9.6.1",
     "file-saver": "^2.0.5",
@@ -23,6 +27,7 @@
     "jspdf-autotable": "^5.0.7",
     "mammoth": "^1.12.0",
     "next": "16.2.4",
+    "pdf-parse": "^2.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
@@ -30,11 +35,13 @@
     "@tailwindcss/postcss": "^4",
     "@types/file-saver": "^2.0.7",
     "@types/node": "^25.6.0",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "19.2.14",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "prisma": "5.22.0",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "ts-node": "^10.9.2"
   }
 }

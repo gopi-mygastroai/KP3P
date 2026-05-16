@@ -10,6 +10,8 @@ const nextConfig = {
   },
   output: 'standalone' as const,
   outputFileTracing: false,
+  /** pdf-parse / pdfjs-dist must not be webpack-bundled (breaks with Object.defineProperty). */
+  serverExternalPackages: ['pdf-parse', 'pdfjs-dist'],
 } as NextConfig;
 
 export default nextConfig;
