@@ -98,3 +98,8 @@ temp/
 
 # --- Local medical literature & prompt exports (do not push) ---
 medical-lit/
+
+# --- Markdown (commit README.md only; not agent notes, prompt exports, or local docs) ---
+**/*.md
+!README.md
+!**/README.md
