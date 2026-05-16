@@ -1,5 +1,6 @@
 {
-  "buildCommand": "npx prisma generate && next build",
+  "buildCommand": "npm run seed:rulebook-text && npx prisma generate && next build",
+  "installCommand": "npm ci",
   "framework": "nextjs",
   "functions": {
     "src/app/api/generate-caresheet/route.ts": {

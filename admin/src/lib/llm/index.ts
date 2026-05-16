@@ -1,22 +1,38 @@
 import claudeProvider from './claudeProvider';
 import geminiProvider from './geminiProvider';
+import type { CarePlanContext, LLMProvider } from './llmProvider';
 
 export type { LLMProvider } from './llmProvider';
 
-const LLM_PROVIDER = process.env.LLM_PROVIDER || 'claude';
-
-if (LLM_PROVIDER === 'gemini' && !process.env.GEMINI_API_KEY) {
-  throw new Error('GEMINI_API_KEY is required when LLM_PROVIDER=gemini');
+function resolveProviderName(): 'claude' | 'gemini' {
+  const raw = (process.env.LLM_PROVIDER ?? 'claude').trim().toLowerCase();
+  return raw === 'gemini' ? 'gemini' : 'claude';
 }
 
-if (LLM_PROVIDER === 'claude' && !process.env.ANTHROPIC_API_KEY) {
-  throw new Error('ANTHROPIC_API_KEY is required when LLM_PROVIDER=claude');
+function assertLlmEnvConfigured(): void {
+  const name = resolveProviderName();
+  if (name === 'gemini' && !process.env.GEMINI_API_KEY?.trim()) {
+    throw new Error('GEMINI_API_KEY is required when LLM_PROVIDER=gemini');
+  }
+  if (name === 'claude' && !process.env.ANTHROPIC_API_KEY?.trim()) {
+    throw new Error('ANTHROPIC_API_KEY is required when LLM_PROVIDER=claude');
+  }
 }
 
-if (process.env.NODE_ENV !== 'production') {
-  console.log(`[LLM] Active provider: ${LLM_PROVIDER === 'gemini' ? 'gemini' : 'claude'}`);
+function pickProvider(): LLMProvider {
+  return resolveProviderName() === 'gemini' ? geminiProvider : claudeProvider;
 }
 
-const provider = LLM_PROVIDER === 'gemini' ? geminiProvider : claudeProvider;
+/** Validates env and logs provider on first use (safe during `next build`). */
+const llmProvider: LLMProvider = {
+  async generateCarePlan(prompt: string, context?: CarePlanContext): Promise<string> {
+    assertLlmEnvConfigured();
+    const name = resolveProviderName();
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[LLM] Active provider: ${name}`);
+    }
+    return pickProvider().generateCarePlan(prompt, context);
+  },
+};
 
-export default provider;
+export default llmProvider;
