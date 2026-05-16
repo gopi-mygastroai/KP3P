@@ -33,12 +33,17 @@ async function main(): Promise<void> {
 
   console.log(`Running LLM smoke test (LLM_PROVIDER=${LLM_PROVIDER})…`);
 
-  const result = await llmProvider.generateCarePlan(MOCK_PROMPT, {
+  const textStream = await llmProvider.generateCarePlan(MOCK_PROMPT, {
     guidelineText: MOCK_GUIDELINE_TEXT,
     systemPrompt: MOCK_SYSTEM_PROMPT,
     patientIdForLog: 'test-llm-script',
     maxTokens: 1024,
   });
+
+  let result = '';
+  for await (const chunk of textStream) {
+    result += chunk;
+  }
 
   const preview = result.replace(/\s+/g, ' ').trim().slice(0, 200);
 

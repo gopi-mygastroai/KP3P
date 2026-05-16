@@ -1,8 +1,8 @@
 import claudeProvider from './claudeProvider';
 import geminiProvider from './geminiProvider';
-import type { CarePlanContext, LLMProvider } from './llmProvider';
+import type { CarePlanContext, CarePlanTextStream, LLMProvider } from './llmProvider';
 
-export type { LLMProvider } from './llmProvider';
+export type { CarePlanTextStream, LLMProvider } from './llmProvider';
 
 function resolveProviderName(): 'claude' | 'gemini' {
   const raw = (process.env.LLM_PROVIDER ?? 'claude').trim().toLowerCase();
@@ -25,7 +25,7 @@ function pickProvider(): LLMProvider {
 
 /** Validates env and logs provider on first use (safe during `next build`). */
 const llmProvider: LLMProvider = {
-  async generateCarePlan(prompt: string, context?: CarePlanContext): Promise<string> {
+  async generateCarePlan(prompt: string, context?: CarePlanContext): Promise<CarePlanTextStream> {
     assertLlmEnvConfigured();
     const name = resolveProviderName();
     if (process.env.NODE_ENV !== 'production') {

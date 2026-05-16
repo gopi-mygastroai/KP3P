@@ -18,8 +18,10 @@ export interface CarePlanContext {
   patientIdForLog?: string;
 }
 
+export type CarePlanTextStream = AsyncIterable<string>;
+
 export interface LLMProvider {
-  generateCarePlan(prompt: string, context?: CarePlanContext): Promise<string>;
+  generateCarePlan(prompt: string, context?: CarePlanContext): Promise<CarePlanTextStream>;
 }
 
 export class LLMConfigurationError extends Error {

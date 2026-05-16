@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { CarePlanContext, LLMProvider } from './llmProvider';
+import type { CarePlanContext, CarePlanTextStream, LLMProvider } from './llmProvider';
 import { LLMConfigurationError } from './llmProvider';
 
 /** Default model (Google AI Studio). Override with GEMINI_MODEL if needed. */
@@ -18,7 +18,7 @@ function requireContext(context: CarePlanContext | undefined): CarePlanContext {
 }
 
 class GeminiProvider implements LLMProvider {
-  async generateCarePlan(prompt: string, context?: CarePlanContext): Promise<string> {
+  async generateCarePlan(prompt: string, context?: CarePlanContext): Promise<CarePlanTextStream> {
     const ctx = requireContext(context);
 
     const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -59,14 +59,13 @@ class GeminiProvider implements LLMProvider {
       const requestOptions = ctx.signal ? { signal: ctx.signal } : undefined;
       const result = await model.generateContentStream(request, requestOptions);
 
-      let text = '';
-      for await (const chunk of result.stream) {
-        text += chunk.text();
+      async function* textStream(): AsyncGenerator<string> {
+        for await (const chunk of result.stream) {
+          yield chunk.text();
+        }
       }
-      if (!text) {
-        throw new Error('empty response from model');
-      }
-      return text;
+
+      return textStream();
     } catch (err: unknown) {
       if (err instanceof LLMConfigurationError) {
         throw err;

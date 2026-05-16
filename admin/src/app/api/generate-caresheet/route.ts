@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CARE_SHEET_SYSTEM_PROMPT } from '@/lib/care-sheet-system-prompt';
 import { loadIbdRulebookText } from '@/lib/load-ibd-rulebook';
-import { breakdownCareSheetPayload, estimateTokensFromText } from '@/lib/llm-payload-stats';
+import { breakdownCareSheetPayload } from '@/lib/llm-payload-stats';
 import { buildKP3PPrompt, type PatientData } from '@/lib/kp3p-prompt';
 import llmProvider from '@/lib/llm';
 import { LLMConfigurationError } from '@/lib/llm/llmProvider';
@@ -10,7 +10,6 @@ export const maxDuration = 300;
 
 const USER_FRIENDLY_502 =
   'Care sheet generation failed. Please try again or contact support.';
-const MODEL_FORMAT_502 = 'The model returned an unexpected response format.';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -55,7 +54,7 @@ function httpStatusFromUnknown(err: unknown): number | undefined {
   return undefined;
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<Response> {
   let patientIdForLog = 'unknown';
 
   try {
@@ -109,9 +108,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       estimatedInputTokens: payloadStats.estimatedTotalTokens,
     });
 
-    let result: string;
+    let textStream: AsyncIterable<string>;
     try {
-      result = await llmProvider.generateCarePlan(prompt, {
+      textStream = await llmProvider.generateCarePlan(prompt, {
         guidelineText: rulebookText,
         systemPrompt: CARE_SHEET_SYSTEM_PROMPT,
         signal: req.signal,
@@ -145,20 +144,36 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: USER_FRIENDLY_502 }, { status: 502 });
     }
 
-    if (!result.trim() || result.length < 100) {
-      logCaresheetFailure(patientIdForLog, 'claude_empty_or_short_content', new Error('content_too_short'), {
-        contentLength: result.length,
-      });
-      return NextResponse.json({ error: MODEL_FORMAT_502 }, { status: 502 });
-    }
+    const encoder = new TextEncoder();
+    let outputChars = 0;
 
-    console.log('[KP3P] LLM output payload', {
-      patientId: patientIdForLog,
-      outputChars: result.length,
-      estimatedOutputTokens: estimateTokensFromText(result),
+    const readable = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          for await (const chunk of textStream) {
+            outputChars += chunk.length;
+            controller.enqueue(encoder.encode(chunk));
+          }
+          console.log('[KP3P] LLM output payload', {
+            patientId: patientIdForLog,
+            outputChars,
+            estimatedOutputTokens: Math.ceil(outputChars / 4),
+          });
+          controller.close();
+        } catch (err) {
+          logCaresheetFailure(patientIdForLog, 'llm_stream_pipe_failed', err);
+          controller.error(err);
+        }
+      },
     });
 
-    return NextResponse.json({ htmlContent: result }, { status: 200 });
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Transfer-Encoding': 'chunked',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
   } catch (err: unknown) {
     logCaresheetFailure(patientIdForLog, 'generate_caresheet_unhandled', err);
     return NextResponse.json({ error: USER_FRIENDLY_502 }, { status: 502 });

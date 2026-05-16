@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { CarePlanContext, LLMProvider } from './llmProvider';
+import type { CarePlanContext, CarePlanTextStream, LLMProvider } from './llmProvider';
 import { LLMConfigurationError } from './llmProvider';
 
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
@@ -17,7 +17,7 @@ function requireContext(context: CarePlanContext | undefined): CarePlanContext {
 }
 
 class ClaudeProvider implements LLMProvider {
-  async generateCarePlan(prompt: string, context?: CarePlanContext): Promise<string> {
+  async generateCarePlan(prompt: string, context?: CarePlanContext): Promise<CarePlanTextStream> {
     const ctx = requireContext(context);
 
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
@@ -57,12 +57,18 @@ class ClaudeProvider implements LLMProvider {
         ctx.signal ? { signal: ctx.signal } : undefined,
       );
 
-      const message = await stream.finalMessage();
-      const text = message.content
-        .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-        .map((block) => block.text)
-        .join('');
-      return text;
+      async function* textStream(): AsyncGenerator<string> {
+        for await (const chunk of stream) {
+          if (
+            chunk.type === 'content_block_delta' &&
+            chunk.delta.type === 'text_delta'
+          ) {
+            yield chunk.delta.text;
+          }
+        }
+      }
+
+      return textStream();
     } catch (err: unknown) {
       if (err instanceof LLMConfigurationError) {
         throw err;

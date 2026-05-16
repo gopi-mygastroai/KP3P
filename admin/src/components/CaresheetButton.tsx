@@ -141,6 +141,7 @@ export function CaresheetButton({
     setLoadingPhase('llm');
     setStatus('loading');
     setBannerError(null);
+    setHtmlContent('');
     try {
       const res = await fetch('/api/generate-caresheet', {
         method: 'POST',
@@ -148,18 +149,44 @@ export function CaresheetButton({
         body: JSON.stringify(patient),
         signal: ac.signal,
       });
-      const data = await readJsonSafe(res);
-      const apiMessage = typeof data.error === 'string' && data.error.trim() ? data.error : null;
+
+      const contentType = res.headers.get('content-type') ?? '';
 
       if (!res.ok) {
-        setBannerError(apiMessage ?? DEFAULT_CARESHEET_FAILURE);
+        if (contentType.includes('application/json')) {
+          const data = await readJsonSafe(res);
+          const apiMessage =
+            typeof data.error === 'string' && data.error.trim() ? data.error : null;
+          setBannerError(apiMessage ?? DEFAULT_CARESHEET_FAILURE);
+        } else {
+          const text = await res.text();
+          setBannerError(text.trim() || DEFAULT_CARESHEET_FAILURE);
+        }
         setStatus('idle');
         return;
       }
 
-      const html = data.htmlContent;
-      if (typeof html !== 'string' || !html.trim()) {
+      if (!res.body) {
         setBannerError(DEFAULT_CARESHEET_FAILURE);
+        setStatus('idle');
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let html = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        html += decoder.decode(value, { stream: true });
+        setHtmlContent(html);
+      }
+      html += decoder.decode();
+
+      if (!html.trim() || html.length < 100) {
+        setBannerError(DEFAULT_CARESHEET_FAILURE);
+        setHtmlContent('');
         setStatus('idle');
         return;
       }
@@ -263,7 +290,9 @@ export function CaresheetButton({
   };
 
   const showPreviewModal =
-    status === 'preview' || (status === 'loading' && loadingPhase === 'pdf');
+    status === 'preview' ||
+    (status === 'loading' && loadingPhase === 'pdf') ||
+    (status === 'loading' && loadingPhase === 'llm' && htmlContent.length > 0);
   const pdfCaptureBusy = status === 'loading' && loadingPhase === 'pdf';
 
   return (
