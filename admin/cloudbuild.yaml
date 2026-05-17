@@ -1,33 +1,37 @@
 steps:
-  - name: gcr.io/cloud-builders/docker
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
     args:
-      - build
-      - -t
-      - asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:$COMMIT_SHA
-      - -t
-      - asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:latest
-      - .
+      - 'build'
+      - '-t'
+      - 'asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:$COMMIT_SHA'
+      - '-t'
+      - 'asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:latest'
+      - '-f'
+      - 'admin/Dockerfile'
+      - './admin'
 
-  - name: gcr.io/cloud-builders/docker
+  # Step 2: Push both tags
+  - name: 'gcr.io/cloud-builders/docker'
     args:
-      - push
-      - --all-tags
-      - asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin
+      - 'push'
+      - '--all-tags'
+      - 'asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin'
 
-  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    entrypoint: gcloud
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
-      - run
-      - deploy
-      - kp3p-admin
-      - --image=asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:$COMMIT_SHA
-      - --region=asia-south1
-      - --project=kp3p-admin-prod
-      - --quiet
+      - 'gcloud'
+      - 'run'
+      - 'deploy'
+      - 'kp3p-admin'
+      - '--image=asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:$COMMIT_SHA'
+      - '--region=asia-south1'
+      - '--project=kp3p-admin-prod'
+      - '--quiet'
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
 images:
-  - asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:$COMMIT_SHA
-  - asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:latest
+  - 'asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin'
