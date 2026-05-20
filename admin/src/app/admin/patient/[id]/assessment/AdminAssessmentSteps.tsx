@@ -3,6 +3,7 @@ import type { AssessmentFormState, AssessmentUpdateFn } from '@/types/assessment
 import { getErrorMessage } from '@/lib/get-error-message';
 import { composeMontrealClass } from '@/lib/montreal-classification';
 import SesCdScoringTable from './SesCdScoringTable';
+import UpperGiFindingsTable from './UpperGiFindingsTable';
 
 const inter = "'Inter', sans-serif";
 
@@ -764,7 +765,10 @@ export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
         label="SES-CD Scoring"
         description="Score each variable for each segment using the dropdown"
       >
-        <SesCdScoringTable data={data} updateData={updateData} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <SesCdScoringTable data={data} updateData={updateData} />
+          <UpperGiFindingsTable data={data} updateData={updateData} />
+        </div>
       </FieldSection>
     )}
     <FieldSection label="Montreal Classification">

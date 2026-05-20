@@ -3,6 +3,11 @@
 import type { Prisma } from '@prisma/client';
 import { composeMontrealClass, hasMontrealSelections } from '@/lib/montreal-classification';
 import { normalizeSesCdScoring, parseSesCdScoring, serializeSesCdScoring } from '@/lib/ses-cd-scoring';
+import {
+  normalizeUpperGiFindings,
+  parseUpperGiFindings,
+  serializeUpperGiFindings,
+} from '@/lib/upper-gi-findings';
 
 function normalizeJsonArray(val: unknown): string {
   if (Array.isArray(val)) return JSON.stringify(val);
@@ -108,6 +113,11 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
     perianalDisease: typeof b.perianalDisease === 'string' ? b.perianalDisease : '',
     montrealClass: hasMontrealSelections(b) ? composeMontrealClass(b) : '',
     sesCdScoring: serializeSesCdScoring(normalizeSesCdScoring(parseSesCdScoring(b.sesCdScoring))),
+    sesCdClinicalNotes:
+      typeof b.sesCdClinicalNotes === 'string' ? b.sesCdClinicalNotes.trim() : '',
+    upperGiFindings: serializeUpperGiFindings(
+      normalizeUpperGiFindings(parseUpperGiFindings(b.upperGiFindings)),
+    ),
     previousSurgeries: normalizeJsonArray(b.previousSurgeries),
     currentDiseaseActivity: typeof b.currentDiseaseActivity === 'string' ? b.currentDiseaseActivity : '',
     stoolFrequency: typeof b.stoolFrequency === 'string' ? b.stoolFrequency : '',

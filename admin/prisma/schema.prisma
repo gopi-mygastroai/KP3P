@@ -47,7 +47,9 @@ diseaseLocation        String @default("")
 diseaseBehavior        String @default("")
 perianalDisease        String @default("")
 montrealClass     String
-sesCdScoring      String @default("{}")
+sesCdScoring         String @default("{}")
+sesCdClinicalNotes   String @default("")
+upperGiFindings      String @default("{}")
 previousSurgeries String
 
 currentDiseaseActivity String

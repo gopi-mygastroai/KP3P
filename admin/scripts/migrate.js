@@ -55,6 +55,8 @@ async function main() {
           perianalDisease: patient.perianalDisease || '',
           montrealClass: patient.montrealClass || '',
           sesCdScoring: patient.sesCdScoring || '{}',
+          sesCdClinicalNotes: patient.sesCdClinicalNotes || '',
+          upperGiFindings: patient.upperGiFindings || '{}',
           previousSurgeries: patient.previousSurgeries || '[]',
           
           currentDiseaseActivity: patient.currentDiseaseActivity || '',

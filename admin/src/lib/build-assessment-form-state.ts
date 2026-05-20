@@ -1,5 +1,10 @@
 import { composeMontrealClass, hasMontrealSelections } from '@/lib/montreal-classification';
 import { normalizeSesCdScoring, parseSesCdScoring, serializeSesCdScoring } from '@/lib/ses-cd-scoring';
+import {
+  normalizeUpperGiFindings,
+  parseUpperGiFindings,
+  serializeUpperGiFindings,
+} from '@/lib/upper-gi-findings';
 import { preferredLanguageScalarForForm } from '@/lib/preferredLanguagePrompt';
 import { normalizeSmokingStatusForForm } from '@/lib/smoking';
 import type { PatientWithUser, AssessmentFormState } from '@/types/assessment-form';
@@ -59,6 +64,10 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
     normalizeSesCdScoring(parseSesCdScoring(patient.sesCdScoring)),
   );
 
+  const upperGiFindings = serializeUpperGiFindings(
+    normalizeUpperGiFindings(parseUpperGiFindings(patient.upperGiFindings)),
+  );
+
   return {
     ...patient,
     previousSurgeries,
@@ -67,6 +76,7 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
     documents,
     montrealClass,
     sesCdScoring,
+    upperGiFindings,
     smokingStatus: normalizeSmokingStatusForForm(patient.smokingStatus),
     smokingDetails: patient.smokingDetails ?? '',
     preferredLanguage: preferredLanguageScalarForForm(patient.preferredLanguage),
@@ -96,6 +106,8 @@ const PATIENT_SAVE_FIELD_KEYS = [
   'perianalDisease',
   'montrealClass',
   'sesCdScoring',
+  'sesCdClinicalNotes',
+  'upperGiFindings',
   'previousSurgeries',
   'currentDiseaseActivity',
   'stoolFrequency',
