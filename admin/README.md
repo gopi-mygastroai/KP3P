@@ -31,7 +31,7 @@ See [`.env.example`](.env.example). Required for normal operation:
 |----------|---------|
 | `POSTGRES_PRISMA_URL` | Pooled Postgres URL for the app |
 | `POSTGRES_URL_NON_POOLING` | Direct URL for `prisma migrate` |
-| `LLM_PROVIDER` | `claude` (default) or `gemini` |
+| `LLM_PROVIDER` | `gemini` (default) or `claude` |
 | `ANTHROPIC_API_KEY` | Required when `LLM_PROVIDER=claude` |
 | `GEMINI_API_KEY` | Required when `LLM_PROVIDER=gemini` |
 
@@ -132,8 +132,8 @@ Test locally:
 docker build -t kp3p-admin .
 docker run -p 8080:8080 \
   -e POSTGRES_PRISMA_URL="postgresql://test" \
-  -e LLM_PROVIDER="claude" \
-  -e ANTHROPIC_API_KEY="sk-test" \
+  -e LLM_PROVIDER="gemini" \
+  -e GEMINI_API_KEY="your_gemini_api_key_here" \
   kp3p-admin
 ```
 

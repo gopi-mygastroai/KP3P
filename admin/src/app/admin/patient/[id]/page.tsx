@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { composeMontrealClass, hasMontrealSelections } from '@/lib/montreal-classification';
 import { formatSmokingSummary } from '@/lib/smoking';
+import { filledInvestigationEntries, parseIbdInvestigations } from '@/lib/ibd-investigations';
 import PatientActions from '../../../../components/PatientActions';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -44,6 +45,8 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
   const parseComorbidities = (() => {
     try { return JSON.parse(patient.comorbidities || '[]'); } catch { return []; }
   })();
+  const investigationData = parseIbdInvestigations(patient.ibdInvestigations);
+  const investigationEntries = filledInvestigationEntries(investigationData);
 
   const montrealClassDisplay = hasMontrealSelections(patient)
     ? composeMontrealClass(patient)
@@ -533,15 +536,39 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
                 <span className="pr-card-num">04</span>
               </div>
               <div className="pr-field-grid">
-                {[
-                  { label: 'Date of Most Recent Labs', value: patient.dateMostRecentLabs },
-                ].map((f, i) => (
-                  <div className="pr-field" key={i}>
-                    <div className="pr-field-label">{f.label}</div>
-                    <div className={`pr-field-value${!f.value ? ' empty' : ''}`}>{f.value || '—'}</div>
-                  </div>
-                ))}
+                <div className="pr-field">
+                  <div className="pr-field-label">Date of Assessment</div>
+                  <div className={`pr-field-value${!patient.dateMostRecentLabs ? ' empty' : ''}`}>{patient.dateMostRecentLabs || '—'}</div>
+                </div>
               </div>
+              {investigationEntries.length > 0 ? (
+                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {Array.from(
+                    investigationEntries.reduce((groups, entry) => {
+                      const list = groups.get(entry.groupTitle) ?? [];
+                      list.push(entry);
+                      groups.set(entry.groupTitle, list);
+                      return groups;
+                    }, new Map<string, typeof investigationEntries>()),
+                  ).map(([groupTitle, entries]) => (
+                    <div key={groupTitle}>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#475569', marginBottom: 8 }}>
+                        {groupTitle}
+                      </div>
+                      <div className="pr-field-grid">
+                        {entries.map((entry) => (
+                          <div className="pr-field" key={`${groupTitle}-${entry.label}`}>
+                            <div className="pr-field-label">{entry.label}</div>
+                            <div className="pr-field-value">{entry.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ marginTop: 12, color: '#94a3b8', fontSize: 13 }}>No investigation values recorded.</p>
+              )}
             </div>
 
             {/* 05 Current Treatment */}
@@ -646,7 +673,8 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
                 {renderVaccineCard('Hepatitis A', patient.hepatitisA)}
                 {renderVaccineCard('Hepatitis E', patient.hepatitisE)}
                 {renderVaccineCard('Zoster (Shingrix)', patient.zoster)}
-                {renderVaccineCard('MMR / Varicella', patient.mmrVaricella)}
+                {renderVaccineCard('MMR', patient.mmr)}
+                {renderVaccineCard('Varicella', patient.varicella)}
                 {renderVaccineCard('Tetanus (Tdap)', patient.tetanusTdap)}
               </div>
             </div>

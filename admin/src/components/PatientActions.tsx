@@ -9,6 +9,7 @@ import { carePlanPrimaryPatientLanguage } from '@/lib/preferredLanguagePrompt';
 import type { PatientData } from '@/lib/kp3p-prompt';
 import { CaresheetButton } from '@/components/CaresheetButton';
 import type { PatientWithUser } from '@/types/assessment-form';
+import { filledInvestigationEntries, parseIbdInvestigations } from '@/lib/ibd-investigations';
 import { getErrorMessage } from '@/lib/get-error-message';
 
 /** Full vaccine line(s) for Gemini prompt — includes dose dates when stored as structured JSON. */
@@ -91,7 +92,8 @@ function toKP3PPatient(patient: PatientWithUser): PatientData {
     vaccineHepE: vaccineForKP3Prompt(patient.hepatitisE),
     vaccineZoster: vaccineForKP3Prompt(patient.zoster),
     vaccineTetanus: vaccineForKP3Prompt(patient.tetanusTdap),
-    vaccineMmr: vaccineForKP3Prompt(patient.mmrVaricella),
+    vaccineMmr: vaccineForKP3Prompt(patient.mmr || patient.mmrVaricella),
+    vaccineVaricella: vaccineForKP3Prompt(patient.varicella),
     vaccines: {
       influenza: vaccineForKP3Prompt(patient.influenza),
       covid19: vaccineForKP3Prompt(patient.covid19),
@@ -99,7 +101,8 @@ function toKP3PPatient(patient: PatientWithUser): PatientData {
       hepatitisA: vaccineForKP3Prompt(patient.hepatitisA),
       hepatitisB: vaccineForKP3Prompt(patient.hepatitisB),
       zoster: vaccineForKP3Prompt(patient.zoster),
-      mmr: vaccineForKP3Prompt(patient.mmrVaricella),
+      mmr: vaccineForKP3Prompt(patient.mmr || patient.mmrVaricella),
+      varicella: vaccineForKP3Prompt(patient.varicella),
       tdap: vaccineForKP3Prompt(patient.tetanusTdap),
     },
   };
@@ -151,14 +154,14 @@ Diagnosis:${patient.primaryDiagnosis||''} Montreal:${patient.montrealClass||''} 
 [ACTIVITY]
 Level:${patient.currentDiseaseActivity||''} BowelFreq:${patient.stoolFrequency||''} BloodInStool:${patient.bloodInStool||''} AbdPain:${patient.abdominalPain||''} QoL:${patient.impactOnQoL||''} WeightLoss:${patient.weightLoss||''}
 [LABS]
-MostRecentLabsDate:${patient.dateMostRecentLabs||'None'}
+MostRecentLabsDate:${patient.dateMostRecentLabs||'None'} InvestigationValues:${filledInvestigationEntries(parseIbdInvestigations(patient.ibdInvestigations)).map((entry)=>`${entry.label}=${entry.value}`).join('; ')||'None'}
 [TREATMENT]
 CurrentMeds:${patient.currentIbdMedications||'None'} Response:${patient.responseToTreatment||''} TDM:${patient.tdmResults||''} Steroids:${patient.steroidUse||''} Supplements:${patient.currentSupplements||''}
 PriorTx:${parseArray(patient.previousTreatmentsTried)} FailedTx:${patient.failedTreatments||''}
 [SCREENING]
 TB:${patient.tbScreening||''} HBsAg:${patient.hepBSurfaceAg||''} AntiHBs:${patient.hepBSurfaceAb||''} AntiHBc:${patient.hepBCoreAb||''} AntiHCV:${patient.antiHcv||''} AntiHIV:${patient.antiHiv||''}
 [VACCINES]
-Influenza:${formatVaccineForDocExport(patient.influenza)} COVID19:${formatVaccineForDocExport(patient.covid19)} Pneumococcal:${formatVaccineForDocExport(patient.pneumococcal)} HepB:${formatVaccineForDocExport(patient.hepatitisB)} HepA:${formatVaccineForDocExport(patient.hepatitisA)} HepE:${formatVaccineForDocExport(patient.hepatitisE)} Zoster:${formatVaccineForDocExport(patient.zoster)} MMR/Varicella:${formatVaccineForDocExport(patient.mmrVaricella)} Tdap:${formatVaccineForDocExport(patient.tetanusTdap)}
+Influenza:${formatVaccineForDocExport(patient.influenza)} COVID19:${formatVaccineForDocExport(patient.covid19)} Pneumococcal:${formatVaccineForDocExport(patient.pneumococcal)} HepB:${formatVaccineForDocExport(patient.hepatitisB)} HepA:${formatVaccineForDocExport(patient.hepatitisA)} HepE:${formatVaccineForDocExport(patient.hepatitisE)} Zoster:${formatVaccineForDocExport(patient.zoster)} MMR:${formatVaccineForDocExport(patient.mmr || patient.mmrVaricella)} Varicella:${formatVaccineForDocExport(patient.varicella)} Tdap:${formatVaccineForDocExport(patient.tetanusTdap)}
 [OTHER]
 Comorbidities:${parseArray(patient.comorbidities)} EIM:${patient.extraintestinalManif||'None'} Pregnancy:${patient.pregnancyPlanning||''} SpecialNotes:${patient.specialConsiderations||''}
 Format: 3-page concise care plan. Part1(Clinical Protocol):English. Part2(Patient Care Plan):${carePlanPrimaryPatientLanguage(patient.preferredLanguage)}`;

@@ -19,7 +19,7 @@ if (providerFromShell) {
   process.env.LLM_PROVIDER = providerFromShell;
 }
 
-const LLM_PROVIDER = process.env.LLM_PROVIDER || 'claude';
+const LLM_PROVIDER = process.env.LLM_PROVIDER || 'gemini';
 const providerName = LLM_PROVIDER === 'gemini' ? 'gemini' : 'claude';
 
 const MOCK_SYSTEM_PROMPT =

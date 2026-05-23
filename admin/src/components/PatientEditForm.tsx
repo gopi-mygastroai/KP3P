@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PatientWithUser } from '@/types/assessment-form';
 import { getErrorMessage } from '@/lib/get-error-message';
+import { buildAssessmentFormState } from '@/lib/build-assessment-form-state';
+import IbdInvestigationsForm from '@/app/admin/patient/[id]/assessment/IbdInvestigationsForm';
 
 export default function PatientEditForm({ patient }: { patient: PatientWithUser }) {
   const router = useRouter();
@@ -528,9 +530,10 @@ export default function PatientEditForm({ patient }: { patient: PatientWithUser 
               <span className="pr-card-title">Laboratory & Investigations</span>
               <span className="pr-card-number">04</span>
             </div>
-            <div className="pr-field-grid">
-              {renderField('Date of Most Recent Labs', 'dateMostRecentLabs', 'date')}
-            </div>
+            <IbdInvestigationsForm
+              data={buildAssessmentFormState(formData)}
+              updateData={(patch) => setFormData((prev) => ({ ...prev, ...patch }) as PatientWithUser)}
+            />
           </div>
 
           {/* 5. Current Treatment */}
@@ -607,7 +610,8 @@ export default function PatientEditForm({ patient }: { patient: PatientWithUser 
               {renderField('Hepatitis A', 'hepatitisA')}
               {renderField('Hepatitis E', 'hepatitisE')}
               {renderField('Zoster', 'zoster')}
-              {renderField('MMR / Varicella', 'mmrVaricella')}
+              {renderField('MMR', 'mmr')}
+              {renderField('Varicella', 'varicella')}
               {renderField('Tetanus (Tdap)', 'tetanusTdap')}
             </div>
           </div>

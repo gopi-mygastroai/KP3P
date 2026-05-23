@@ -12,6 +12,11 @@ import {
 } from '@/lib/uc-endoscopic-scoring';
 import { preferredLanguageScalarForForm } from '@/lib/preferredLanguagePrompt';
 import { normalizeSmokingStatusForForm } from '@/lib/smoking';
+import {
+  normalizeIbdInvestigations,
+  parseIbdInvestigations,
+  serializeIbdInvestigations,
+} from '@/lib/ibd-investigations';
 import type { PatientWithUser, AssessmentFormState } from '@/types/assessment-form';
 
 function assessmentField(data: AssessmentFormState, key: string): unknown {
@@ -77,6 +82,16 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
     normalizeUcEndoscopicScoring(parseUcEndoscopicScoring(patient.ucEndoscopicScoring)),
   );
 
+  const parsedInvestigations = parseIbdInvestigations(patient.ibdInvestigations);
+  const ibdInvestigations = serializeIbdInvestigations(parsedInvestigations);
+
+  const mmr =
+    String(patient.mmr ?? '').trim() && patient.mmr !== '{}'
+      ? patient.mmr
+      : String(patient.mmrVaricella ?? '').trim() && patient.mmrVaricella !== '{}'
+        ? patient.mmrVaricella
+        : '{}';
+
   return {
     ...patient,
     previousSurgeries,
@@ -87,6 +102,9 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
     sesCdScoring,
     upperGiFindings,
     ucEndoscopicScoring,
+    ibdInvestigations,
+    mmr,
+    varicella: patient.varicella ?? '{}',
     smokingStatus: normalizeSmokingStatusForForm(patient.smokingStatus),
     smokingDetails: patient.smokingDetails ?? '',
     preferredLanguage: preferredLanguageScalarForForm(patient.preferredLanguage),
@@ -129,6 +147,7 @@ const PATIENT_SAVE_FIELD_KEYS = [
   'activityScore',
   'dateMostRecentLabs',
   'recentLabValues',
+  'ibdInvestigations',
   'dateMostRecentColonoscopy',
   'colonoscopyFindings',
   'recentImaging',
@@ -153,6 +172,8 @@ const PATIENT_SAVE_FIELD_KEYS = [
   'hepatitisA',
   'hepatitisE',
   'zoster',
+  'mmr',
+  'varicella',
   'mmrVaricella',
   'tetanusTdap',
   'comorbidities',
@@ -163,6 +184,7 @@ const PATIENT_SAVE_FIELD_KEYS = [
   'specialConsiderations',
   'documents',
   'assessmentComplete',
+  'assessmentCurrentStep',
 ] as const;
 
 /** Build a JSON-safe payload for assessment saves (no nested user / Prisma metadata). */

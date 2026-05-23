@@ -50,3 +50,44 @@ export function composeMontrealClass(fields: MontrealFieldValues): string {
 
   return codes.join(' - ');
 }
+
+function isNonEmpty(v: unknown): boolean {
+  return String(v ?? '').trim() !== '';
+}
+
+/** Mandatory Montreal fields depend on primary IBD diagnosis (assessment step 2). */
+export function montrealValidationMissing(
+  primaryDiagnosis: unknown,
+  fields: MontrealFieldValues,
+): string[] {
+  const diagnosis = String(primaryDiagnosis ?? '').trim();
+  const missing: string[] = [];
+
+  if (diagnosis === 'Ulcerative Colitis') {
+    if (!isNonEmpty(fields.montrealAgeAtDiagnosis)) {
+      missing.push('Age at Diagnosis (Montreal)');
+    }
+    return missing;
+  }
+
+  if (diagnosis === "Crohn's Disease") {
+    if (!isNonEmpty(fields.montrealAgeAtDiagnosis)) missing.push('Age at Diagnosis (Montreal)');
+    if (!isNonEmpty(fields.diseaseLocation)) missing.push('Location of the disease');
+    if (!isNonEmpty(fields.diseaseBehavior)) missing.push('Behavior');
+    if (!isNonEmpty(fields.perianalDisease)) missing.push('Perianal');
+  }
+
+  return missing;
+}
+
+export function isMontrealFieldRequired(
+  primaryDiagnosis: unknown,
+  field: keyof MontrealFieldValues,
+): boolean {
+  const diagnosis = String(primaryDiagnosis ?? '').trim();
+  if (field === 'montrealAgeAtDiagnosis') {
+    return diagnosis === 'Ulcerative Colitis' || diagnosis === "Crohn's Disease";
+  }
+  if (diagnosis !== "Crohn's Disease") return false;
+  return field === 'diseaseLocation' || field === 'diseaseBehavior' || field === 'perianalDisease';
+}

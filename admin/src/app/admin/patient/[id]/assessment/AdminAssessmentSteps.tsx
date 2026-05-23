@@ -1,10 +1,11 @@
 import React from 'react';
 import type { AssessmentFormState, AssessmentUpdateFn } from '@/types/assessment-form';
 import { getErrorMessage } from '@/lib/get-error-message';
-import { composeMontrealClass } from '@/lib/montreal-classification';
+import { composeMontrealClass, isMontrealFieldRequired } from '@/lib/montreal-classification';
 import SesCdScoringTable from './SesCdScoringTable';
 import UpperGiFindingsTable from './UpperGiFindingsTable';
 import UcEndoscopicScoringTool from './UcEndoscopicScoringTool';
+import IbdInvestigationsForm from './IbdInvestigationsForm';
 
 const inter = "'Inter', sans-serif";
 
@@ -52,13 +53,6 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
   boxSizing: 'border-box',
   transition: 'border-color 0.15s',
-};
-
-/** Narrower date pickers for investigations step (labs / colonoscopy). */
-const investigationDateInputStyle: React.CSSProperties = {
-  ...inputStyle,
-  width: '100%',
-  maxWidth: 200,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -527,7 +521,8 @@ const vaccineFields = [
   { name: 'hepatitisA', label: 'Hepatitis A' },
   { name: 'hepatitisE', label: 'Hepatitis E' },
   { name: 'zoster', label: 'Zoster' },
-  { name: 'mmrVaricella', label: 'MMR / Varicella' },
+  { name: 'mmr', label: 'MMR' },
+  { name: 'varicella', label: 'Varicella' },
   { name: 'tetanusTdap', label: 'Tetanus / Tdap' },
 ];
 
@@ -751,6 +746,7 @@ export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
     perianalDisease: data.perianalDisease,
   };
   const montrealClassSummary = composeMontrealClass(montrealFields);
+  const diagnosis = data.primaryDiagnosis;
 
   return (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -812,10 +808,38 @@ export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
         </span>
       </div>
       <ColumnStack>
-        {radioGroup('montrealAgeAtDiagnosis', 'Age at Diagnosis', [...MONTREAL_AGE_AT_DIAGNOSIS], data, updateMontrealField, true)}
-        {radioGroup('diseaseLocation', 'Location of the disease', [...DISEASE_LOCATIONS], data, updateMontrealField, true)}
-        {radioGroup('diseaseBehavior', 'Behavior', [...DISEASE_BEHAVIORS], data, updateMontrealField, true)}
-        {radioGroup('perianalDisease', 'Perianal', [...PERIANAL_OPTIONS], data, updateMontrealField, true)}
+        {radioGroup(
+          'montrealAgeAtDiagnosis',
+          'Age at Diagnosis',
+          [...MONTREAL_AGE_AT_DIAGNOSIS],
+          data,
+          updateMontrealField,
+          isMontrealFieldRequired(diagnosis, 'montrealAgeAtDiagnosis'),
+        )}
+        {radioGroup(
+          'diseaseLocation',
+          'Location of the disease',
+          [...DISEASE_LOCATIONS],
+          data,
+          updateMontrealField,
+          isMontrealFieldRequired(diagnosis, 'diseaseLocation'),
+        )}
+        {radioGroup(
+          'diseaseBehavior',
+          'Behavior',
+          [...DISEASE_BEHAVIORS],
+          data,
+          updateMontrealField,
+          isMontrealFieldRequired(diagnosis, 'diseaseBehavior'),
+        )}
+        {radioGroup(
+          'perianalDisease',
+          'Perianal',
+          [...PERIANAL_OPTIONS],
+          data,
+          updateMontrealField,
+          isMontrealFieldRequired(diagnosis, 'perianalDisease'),
+        )}
       </ColumnStack>
     </FieldSection>
     {data.primaryDiagnosis === "Crohn's Disease" && (
@@ -865,85 +889,7 @@ export const AdminStep5 = ({ data, updateData }: StepComponentProps) => (
 );
 
 export const AdminStep6 = ({ data, updateData }: StepComponentProps) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-    <FieldBox label="Date of Most Recent Labs" required>
-      <input
-        type="date"
-        required
-        style={investigationDateInputStyle}
-        value={data.dateMostRecentLabs || ''}
-        onChange={(e) => updateData({ dateMostRecentLabs: e.target.value })}
-        onFocus={(e) => (e.target.style.borderColor = '#0891b2')}
-        onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
-      />
-    </FieldBox>
-    <FieldBox label="Recent Lab Values" required>
-      <input
-        type="text"
-        required
-        style={inputStyle}
-        value={data.recentLabValues || ''}
-        onChange={(e) => updateData({ recentLabValues: e.target.value })}
-        onFocus={(e) => (e.target.style.borderColor = '#0891b2')}
-        onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
-      />
-      <p style={{ fontSize: 11, color: '#64748b', margin: 0, fontFamily: inter }}>
-        Fill in: Hb, TLC, Platelets, CRP, Albumin, ESR, SGOT, SGPT, T bilirubin, Creatinine (whichever available in same order)
-      </p>
-    </FieldBox>
-    <FieldBox label="Date of Most Recent Colonoscopy" required>
-      <input
-        type="date"
-        required
-        style={investigationDateInputStyle}
-        value={data.dateMostRecentColonoscopy || ''}
-        onChange={(e) => updateData({ dateMostRecentColonoscopy: e.target.value })}
-        onFocus={(e) => (e.target.style.borderColor = '#0891b2')}
-        onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
-      />
-    </FieldBox>
-    <FieldBox label="Colonoscopy Findings" required>
-      <input
-        type="text"
-        required
-        style={inputStyle}
-        value={data.colonoscopyFindings || ''}
-        onChange={(e) => updateData({ colonoscopyFindings: e.target.value })}
-        onFocus={(e) => (e.target.style.borderColor = '#0891b2')}
-        onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
-      />
-      <p style={{ fontSize: 11, color: '#64748b', margin: 0, fontFamily: inter }}>
-        Mayo endoscopic score (UC) or SES-CD (CD), ulcers, strictures, fistulas. Example - Mayo 2, moderate inflammation sigmoid/rectum, no ulcers
-      </p>
-    </FieldBox>
-    <FieldBox label="Recent Imaging" required>
-      <input
-        type="text"
-        required
-        style={inputStyle}
-        value={data.recentImaging || ''}
-        onChange={(e) => updateData({ recentImaging: e.target.value })}
-        onFocus={(e) => (e.target.style.borderColor = '#0891b2')}
-        onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
-      />
-      <p style={{ fontSize: 11, color: '#64748b', margin: 0, fontFamily: inter }}>
-        MRE, CT enterography, pelvic MRI - date and key findings
-      </p>
-    </FieldBox>
-    <FieldBox label="Most Recent DEXA Scan">
-      <input
-        type="text"
-        style={inputStyle}
-        value={data.mostRecentDexaScan || ''}
-        onChange={(e) => updateData({ mostRecentDexaScan: e.target.value })}
-        onFocus={(e) => (e.target.style.borderColor = '#0891b2')}
-        onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
-      />
-      <p style={{ fontSize: 11, color: '#64748b', margin: 0, fontFamily: inter }}>
-        T-score and date if done
-      </p>
-    </FieldBox>
-  </div>
+  <IbdInvestigationsForm data={data} updateData={updateData} />
 );
 
 export const AdminStep7 = ({ data, updateData }: StepComponentProps) => (

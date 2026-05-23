@@ -63,6 +63,7 @@ activityScore          String @default("")
 
 dateMostRecentLabs   String
 recentLabValues      String @default("")
+ibdInvestigations    String @default("{}")
 dateMostRecentColonoscopy String @default("")
 colonoscopyFindings  String @default("")
 recentImaging        String @default("")
@@ -90,6 +91,8 @@ hepatitisB       String
 hepatitisA       String
 hepatitisE       String
 zoster           String
+mmr              String @default("{}")
+varicella        String @default("{}")
 mmrVaricella     String
 tetanusTdap      String
 
@@ -102,6 +105,7 @@ specialConsiderations String
 documents             String? @default("[]")
 
 assessmentComplete Boolean @default(false)
+assessmentCurrentStep Int @default(1)
 
 createdAt DateTime @default(now())
 updatedAt DateTime @updatedAt

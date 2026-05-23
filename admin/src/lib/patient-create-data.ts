@@ -13,6 +13,7 @@ import {
   parseUpperGiFindings,
   serializeUpperGiFindings,
 } from '@/lib/upper-gi-findings';
+import { normalizeIbdInvestigations, parseIbdInvestigations, serializeIbdInvestigations } from '@/lib/ibd-investigations';
 
 function normalizeJsonArray(val: unknown): string {
   if (Array.isArray(val)) return JSON.stringify(val);
@@ -136,6 +137,7 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
     activityScore: typeof b.activityScore === 'string' ? b.activityScore : '',
     dateMostRecentLabs,
     recentLabValues: typeof b.recentLabValues === 'string' ? b.recentLabValues : '',
+    ibdInvestigations: serializeIbdInvestigations(normalizeIbdInvestigations(parseIbdInvestigations(b.ibdInvestigations))),
     dateMostRecentColonoscopy: typeof b.dateMostRecentColonoscopy === 'string' ? b.dateMostRecentColonoscopy : '',
     colonoscopyFindings: typeof b.colonoscopyFindings === 'string' ? b.colonoscopyFindings : '',
     recentImaging: typeof b.recentImaging === 'string' ? b.recentImaging : '',
@@ -160,6 +162,8 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
     hepatitisA: normalizeJsonObject(b.hepatitisA),
     hepatitisE: normalizeJsonObject(b.hepatitisE),
     zoster: normalizeJsonObject(b.zoster),
+    mmr: normalizeJsonObject(b.mmr),
+    varicella: normalizeJsonObject(b.varicella),
     mmrVaricella: normalizeJsonObject(b.mmrVaricella),
     tetanusTdap: normalizeJsonObject(b.tetanusTdap),
     comorbidities: normalizeJsonArray(b.comorbidities),
@@ -170,5 +174,9 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
     specialConsiderations: typeof b.specialConsiderations === 'string' ? b.specialConsiderations : '',
     documents: normalizeJsonArray(documents),
     assessmentComplete: b.assessmentComplete === true,
+    assessmentCurrentStep: (() => {
+      const n = parseInt(String(b.assessmentCurrentStep ?? ''), 10);
+      return Number.isFinite(n) && n >= 1 && n <= 8 ? n : 1;
+    })(),
   };
 }

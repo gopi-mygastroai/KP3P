@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef, useCallback } from 'react';
 import { PatientData } from '@/lib/kp3p-prompt';
+import { injectKp3pLocalDetails } from '@/lib/kp3p-post-process';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -45,33 +46,60 @@ function safeFileSegment(name: string): string {
   return s || 'Patient';
 }
 
-/** Split KP-3P preview DOM into Part 1 (physician) vs Part 2 (patient) using the Part 2 heading. */
-function getKp3pPartSections(
-  previewRoot: HTMLElement,
-): { part1: HTMLElement[]; part2: HTMLElement[] } | null {
-  const h3Part2 = [...previewRoot.querySelectorAll('h3')].find((h) => {
-    const t = (h.textContent ?? '').replace(/\s+/g, ' ').trim();
-    return /PART\s*2/i.test(t) && /PATIENT/i.test(t) && /CARE\s*PLAN/i.test(t);
-  });
-  if (!h3Part2) return null;
+function normalizeHeadingText(el: Element): string {
+  return (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
 
-  let startPart2: Element = h3Part2;
-  const prev = h3Part2.previousElementSibling;
-  if (prev?.tagName === 'H2') startPart2 = prev;
-
-  let boundary: Element | null = startPart2;
+function topLevelBoundary(previewRoot: HTMLElement, startEl: Element): HTMLElement | null {
+  let boundary: Element | null = startEl;
   while (boundary && boundary.parentElement !== previewRoot) {
     boundary = boundary.parentElement;
   }
-  if (!boundary) return null;
+  return boundary as HTMLElement | null;
+}
 
+function findDocumentStart(
+  previewRoot: HTMLElement,
+  docNumber: 2 | 3,
+): HTMLElement | null {
+  const headings = [...previewRoot.querySelectorAll('h2, h3')] as HTMLElement[];
+  const pattern =
+    docNumber === 2
+      ? /DOCUMENT\s*2|PATIENT\s*INFORMATION\s*SHEET|YOUR\s*IBD\s*CARE\s*PLAN/i
+      : /DOCUMENT\s*3|PRESCRIPTION\s*SHEET/i;
+
+  const match = headings.find((h) => pattern.test(normalizeHeadingText(h)));
+  if (!match) return null;
+
+  let start: Element = match;
+  if (match.tagName === 'H3') {
+    const prev = match.previousElementSibling;
+    if (prev?.tagName === 'H2' && pattern.test(normalizeHeadingText(prev))) {
+      start = prev;
+    }
+  }
+  return topLevelBoundary(previewRoot, start);
+}
+
+/** Split KP-3P preview DOM into three documents using DOCUMENT 2 / DOCUMENT 3 headings. */
+function getKp3pDocumentSections(previewRoot: HTMLElement): {
+  doc1: HTMLElement[];
+  doc2: HTMLElement[];
+  doc3: HTMLElement[];
+} | null {
   const topLevel = [...previewRoot.children] as HTMLElement[];
-  const idx2 = topLevel.indexOf(boundary as HTMLElement);
-  if (idx2 < 0) return null;
+  const doc2Boundary = findDocumentStart(previewRoot, 2);
+  const doc3Boundary = findDocumentStart(previewRoot, 3);
+  if (!doc2Boundary || !doc3Boundary) return null;
+
+  const idx2 = topLevel.indexOf(doc2Boundary);
+  const idx3 = topLevel.indexOf(doc3Boundary);
+  if (idx2 < 1 || idx3 <= idx2) return null;
 
   return {
-    part1: topLevel.slice(0, idx2),
-    part2: topLevel.slice(idx2),
+    doc1: topLevel.slice(0, idx2),
+    doc2: topLevel.slice(idx2, idx3),
+    doc3: topLevel.slice(idx3),
   };
 }
 
@@ -191,7 +219,12 @@ export function CaresheetButton({
         return;
       }
 
-      setHtmlContent(html);
+      setHtmlContent(
+        injectKp3pLocalDetails(html, {
+          patientName: patient.name,
+          patientId: patient.id,
+        }),
+      );
       setStatus('preview');
     } catch (e: unknown) {
       if (isAbortError(e)) {
@@ -258,26 +291,34 @@ export function CaresheetButton({
     };
 
     try {
-      const sections = getKp3pPartSections(editable);
-      if (!sections || sections.part1.length === 0 || sections.part2.length === 0) {
+      const sections = getKp3pDocumentSections(editable);
+      if (
+        !sections ||
+        sections.doc1.length === 0 ||
+        sections.doc2.length === 0 ||
+        sections.doc3.length === 0
+      ) {
         setBannerError(
-          'Could not split into Part 1 and Part 2. Keep the “PART 2: PATIENT CARE PLAN” heading, then try again.',
+          'Could not split into three documents. Keep the “DOCUMENT 2” and “DOCUMENT 3” headings, then try again.',
         );
         setStatus('preview');
         return;
       }
 
-      const host1 = buildHost(sections.part1);
-      const host2 = buildHost(sections.part2);
+      const host1 = buildHost(sections.doc1);
+      const host2 = buildHost(sections.doc2);
+      const host3 = buildHost(sections.doc3);
       try {
         await htmlHostToPdf(
           host1,
-          `KP3P_${baseName}_PART1_Clinical_Protocol_Physician_Record.pdf`,
+          `KP3P_${baseName}_DOC1_Clinician_Record.pdf`,
         );
-        await htmlHostToPdf(host2, `KP3P_${baseName}_PART2_Patient_Care_Plan.pdf`);
+        await htmlHostToPdf(host2, `KP3P_${baseName}_DOC2_Patient_Information_Sheet.pdf`);
+        await htmlHostToPdf(host3, `KP3P_${baseName}_DOC3_Prescription_Sheet.pdf`);
       } finally {
         host1.remove();
         host2.remove();
+        host3.remove();
       }
 
       setStatus('idle');
@@ -294,6 +335,8 @@ export function CaresheetButton({
     (status === 'loading' && loadingPhase === 'pdf') ||
     (status === 'loading' && loadingPhase === 'llm' && htmlContent.length > 0);
   const pdfCaptureBusy = status === 'loading' && loadingPhase === 'pdf';
+  const llmStreaming = status === 'loading' && loadingPhase === 'llm';
+  const readyForReview = status === 'preview';
 
   return (
     <>
@@ -452,13 +495,13 @@ export function CaresheetButton({
               }}
             >
               <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#0f172a' }}>
-                Preview Caresheet
+                {llmStreaming ? 'Generating Care Sheet…' : 'Preview Caresheet'}
               </h2>
               <button
                 type="button"
-                disabled={pdfCaptureBusy}
+                disabled={pdfCaptureBusy || llmStreaming}
                 onClick={() => {
-                  if (pdfCaptureBusy) return;
+                  if (pdfCaptureBusy || llmStreaming) return;
                   setStatus('idle');
                   dismissBanner();
                 }}
@@ -466,9 +509,9 @@ export function CaresheetButton({
                   background: 'none',
                   border: 'none',
                   fontSize: '24px',
-                  cursor: pdfCaptureBusy ? 'not-allowed' : 'pointer',
+                  cursor: pdfCaptureBusy || llmStreaming ? 'not-allowed' : 'pointer',
                   color: '#64748b',
-                  opacity: pdfCaptureBusy ? 0.4 : 1,
+                  opacity: pdfCaptureBusy || llmStreaming ? 0.4 : 1,
                 }}
               >
                 &times;
@@ -482,8 +525,8 @@ export function CaresheetButton({
                 style={{
                   marginBottom: '16px',
                   padding: '12px',
-                  backgroundColor: '#e0f2fe',
-                  color: '#0369a1',
+                  backgroundColor: llmStreaming ? '#fef3c7' : '#e0f2fe',
+                  color: llmStreaming ? '#92400e' : '#0369a1',
                   borderRadius: '8px',
                   fontSize: '14px',
                   display: 'flex',
@@ -491,8 +534,17 @@ export function CaresheetButton({
                   gap: '8px',
                 }}
               >
-                ✏️ <b>Edit Mode Active:</b> You can click anywhere in the document below to edit the
-                text before downloading.
+                {llmStreaming ? (
+                  <>
+                    ⏳ <b>Generating…</b> The care sheet is still being written. Review and download
+                    will be available when generation completes.
+                  </>
+                ) : (
+                  <>
+                    ✏️ <b>Edit Mode Active:</b> You can click anywhere in the document below to edit
+                    the text before downloading.
+                  </>
+                )}
               </div>
 
               <div
@@ -510,7 +562,7 @@ export function CaresheetButton({
                 <style dangerouslySetInnerHTML={{ __html: KP3P_PREVIEW_STYLES }} />
                 <div
                   className="kp3p-preview"
-                  contentEditable={true}
+                  contentEditable={readyForReview && !pdfCaptureBusy}
                   suppressContentEditableWarning={true}
                   dangerouslySetInnerHTML={{ __html: htmlContent }}
                 />
@@ -523,46 +575,64 @@ export function CaresheetButton({
                 borderTop: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'flex-end',
+                alignItems: 'center',
                 gap: '12px',
               }}
             >
-              <button
-                type="button"
-                disabled={pdfCaptureBusy}
-                onClick={() => {
-                  if (pdfCaptureBusy) return;
-                  setStatus('idle');
-                  dismissBanner();
-                }}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  background: '#fff',
-                  color: '#475569',
-                  cursor: pdfCaptureBusy ? 'not-allowed' : 'pointer',
-                  fontWeight: 600,
-                  opacity: pdfCaptureBusy ? 0.6 : 1,
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={status === 'loading'}
-                onClick={downloadPdf}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  background: '#2563eb',
-                  color: '#fff',
-                  cursor: status === 'loading' ? 'wait' : 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                Confirm & Download PDFs
-              </button>
+              {llmStreaming ? (
+                <span
+                  style={{
+                    marginRight: 'auto',
+                    fontSize: 14,
+                    color: '#64748b',
+                    fontFamily: 'Inter, sans-serif',
+                  }}
+                >
+                  ⏳ Streaming response…
+                </span>
+              ) : null}
+              {!llmStreaming && (
+                <button
+                  type="button"
+                  disabled={pdfCaptureBusy}
+                  onClick={() => {
+                    if (pdfCaptureBusy) return;
+                    setStatus('idle');
+                    dismissBanner();
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#fff',
+                    color: '#475569',
+                    cursor: pdfCaptureBusy ? 'not-allowed' : 'pointer',
+                    fontWeight: 600,
+                    opacity: pdfCaptureBusy ? 0.6 : 1,
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+              {readyForReview && (
+                <button
+                  type="button"
+                  disabled={pdfCaptureBusy}
+                  onClick={downloadPdf}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: '#2563eb',
+                    color: '#fff',
+                    cursor: pdfCaptureBusy ? 'wait' : 'pointer',
+                    fontWeight: 600,
+                    opacity: pdfCaptureBusy ? 0.6 : 1,
+                  }}
+                >
+                  Confirm & Download PDFs
+                </button>
+              )}
             </div>
           </div>
         </div>

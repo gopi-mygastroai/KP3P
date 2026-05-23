@@ -5,7 +5,7 @@ import type { CarePlanContext, CarePlanTextStream, LLMProvider } from './llmProv
 export type { CarePlanTextStream, LLMProvider } from './llmProvider';
 
 function resolveProviderName(): 'claude' | 'gemini' {
-  const raw = (process.env.LLM_PROVIDER ?? 'claude').trim().toLowerCase();
+  const raw = (process.env.LLM_PROVIDER ?? 'gemini').trim().toLowerCase();
   return raw === 'gemini' ? 'gemini' : 'claude';
 }
 

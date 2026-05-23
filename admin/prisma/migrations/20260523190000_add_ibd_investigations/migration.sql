@@ -1,0 +1,1 @@
+ALTER TABLE "Patient" ADD COLUMN IF NOT EXISTS "ibdInvestigations" TEXT NOT NULL DEFAULT '{}';

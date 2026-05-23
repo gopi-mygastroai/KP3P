@@ -73,7 +73,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     const patient = raw as unknown as PatientData;
     patientIdForLog = String(patient.id ?? 'unknown');
 
-    /** Do not send legal name to the model; keep identifiers for the template. */
+    /** Redact patient legal name before sending to LLM; physician contact is never in the prompt. */
     const patientForPrompt: PatientData = {
       ...patient,
       name: patient.id ? `Patient ID ${patient.id}` : 'Patient',
