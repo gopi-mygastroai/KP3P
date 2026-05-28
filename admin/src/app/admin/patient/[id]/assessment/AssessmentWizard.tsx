@@ -174,6 +174,7 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
       missing.push(
         ...montrealValidationMissing(data?.primaryDiagnosis, {
           montrealAgeAtDiagnosis: data?.montrealAgeAtDiagnosis,
+          ucExtent: data?.ucExtent,
           diseaseLocation: data?.diseaseLocation,
           diseaseBehavior: data?.diseaseBehavior,
           perianalDisease: data?.perianalDisease,

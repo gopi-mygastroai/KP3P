@@ -43,6 +43,7 @@ primaryDiagnosis  String
 diseaseDuration   String
 perianalDiseaseAssessment String @default("")
 montrealAgeAtDiagnosis String @default("")
+ucExtent               String @default("")
 diseaseLocation        String @default("")
 diseaseBehavior        String @default("")
 perianalDisease        String @default("")

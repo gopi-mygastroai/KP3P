@@ -74,6 +74,7 @@ export async function GET(): Promise<NextResponse> {
           diseaseDuration: strField(patient, 'diseaseDuration'),
           perianalDiseaseAssessment: strField(patient, 'perianalDiseaseAssessment'),
           montrealAgeAtDiagnosis: strField(patient, 'montrealAgeAtDiagnosis'),
+          ucExtent: strField(patient, 'ucExtent'),
           diseaseLocation: strField(patient, 'diseaseLocation'),
           diseaseBehavior: strField(patient, 'diseaseBehavior'),
           perianalDisease: strField(patient, 'perianalDisease'),

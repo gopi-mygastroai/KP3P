@@ -1,4 +1,4 @@
-import { composeMontrealClass, hasMontrealSelections } from '@/lib/montreal-classification';
+import { composeMontrealClass, hasMontrealSelections, montrealFieldsForDiagnosis } from '@/lib/montreal-classification';
 import { normalizeSesCdScoring, parseSesCdScoring, serializeSesCdScoring } from '@/lib/ses-cd-scoring';
 import {
   normalizeUpperGiFindings,
@@ -67,7 +67,7 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
   }
 
   const montrealClass = hasMontrealSelections(patient)
-    ? composeMontrealClass(patient)
+    ? composeMontrealClass(montrealFieldsForDiagnosis(patient.primaryDiagnosis, patient))
     : '';
 
   const sesCdScoring = serializeSesCdScoring(
@@ -129,6 +129,7 @@ const PATIENT_SAVE_FIELD_KEYS = [
   'diseaseDuration',
   'perianalDiseaseAssessment',
   'montrealAgeAtDiagnosis',
+  'ucExtent',
   'diseaseLocation',
   'diseaseBehavior',
   'perianalDisease',

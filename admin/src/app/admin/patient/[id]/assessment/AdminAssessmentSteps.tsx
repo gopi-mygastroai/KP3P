@@ -1,7 +1,12 @@
 import React from 'react';
 import type { AssessmentFormState, AssessmentUpdateFn } from '@/types/assessment-form';
 import { getErrorMessage } from '@/lib/get-error-message';
-import { composeMontrealClass, isMontrealFieldRequired } from '@/lib/montreal-classification';
+import {
+  composeMontrealClass,
+  isMontrealFieldRequired,
+  isMontrealFieldVisible,
+  montrealFieldsForDiagnosis,
+} from '@/lib/montreal-classification';
 import SesCdScoringTable from './SesCdScoringTable';
 import UpperGiFindingsTable from './UpperGiFindingsTable';
 import UcEndoscopicScoringTool from './UcEndoscopicScoringTool';
@@ -710,6 +715,12 @@ const MONTREAL_AGE_AT_DIAGNOSIS = [
   'A3 (More than 40)',
 ] as const;
 
+const UC_EXTENT_OPTIONS = [
+  'E1 - Ulcerative proctitis',
+  'E2 - Left sided UC (distal UC)',
+  'E3 - Extensive UC (pancolitis)',
+] as const;
+
 const DISEASE_LOCATIONS = [
   'L1 (Ileal)',
   'L2 (Colonic)',
@@ -726,32 +737,74 @@ const DISEASE_BEHAVIORS = [
 const PERIANAL_OPTIONS = ['P (Yes)', 'No'] as const;
 
 export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
+  const diagnosis = data.primaryDiagnosis;
+
   const updateMontrealField: AssessmentUpdateFn = (patch) => {
     const merged = { ...(data as Record<string, unknown>), ...patch };
+    const montrealFields = {
+      montrealAgeAtDiagnosis: merged.montrealAgeAtDiagnosis,
+      ucExtent: merged.ucExtent,
+      diseaseLocation: merged.diseaseLocation,
+      diseaseBehavior: merged.diseaseBehavior,
+      perianalDisease: merged.perianalDisease,
+    };
     updateData({
       ...patch,
-      montrealClass: composeMontrealClass({
-        montrealAgeAtDiagnosis: merged.montrealAgeAtDiagnosis,
-        diseaseLocation: merged.diseaseLocation,
-        diseaseBehavior: merged.diseaseBehavior,
-        perianalDisease: merged.perianalDisease,
-      }),
+      montrealClass: composeMontrealClass(montrealFieldsForDiagnosis(diagnosis, montrealFields)),
     });
+  };
+
+  const updatePrimaryDiagnosis: AssessmentUpdateFn = (patch) => {
+    const nextDiagnosis = String(patch.primaryDiagnosis ?? diagnosis ?? '').trim();
+    if (nextDiagnosis === "Crohn's Disease") {
+      updateData({
+        ...patch,
+        ucExtent: '',
+        montrealClass: composeMontrealClass(
+          montrealFieldsForDiagnosis(nextDiagnosis, {
+            montrealAgeAtDiagnosis: data.montrealAgeAtDiagnosis,
+            diseaseLocation: data.diseaseLocation,
+            diseaseBehavior: data.diseaseBehavior,
+            perianalDisease: data.perianalDisease,
+          }),
+        ),
+      });
+      return;
+    }
+    if (nextDiagnosis !== "Crohn's Disease") {
+      updateData({
+        ...patch,
+        diseaseLocation: '',
+        diseaseBehavior: '',
+        perianalDisease: '',
+        ucExtent: nextDiagnosis === 'Ulcerative Colitis' ? data.ucExtent : '',
+        montrealClass: composeMontrealClass(
+          montrealFieldsForDiagnosis(nextDiagnosis, {
+            montrealAgeAtDiagnosis: data.montrealAgeAtDiagnosis,
+            ucExtent: nextDiagnosis === 'Ulcerative Colitis' ? data.ucExtent : '',
+          }),
+        ),
+      });
+      return;
+    }
+    updateData(patch);
   };
 
   const montrealFields = {
     montrealAgeAtDiagnosis: data.montrealAgeAtDiagnosis,
+    ucExtent: data.ucExtent,
     diseaseLocation: data.diseaseLocation,
     diseaseBehavior: data.diseaseBehavior,
     perianalDisease: data.perianalDisease,
   };
-  const montrealClassSummary = composeMontrealClass(montrealFields);
-  const diagnosis = data.primaryDiagnosis;
+  const montrealClassSummary = composeMontrealClass(
+    montrealFieldsForDiagnosis(diagnosis, montrealFields),
+  );
 
   return (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
     <Grid2>
-      {radioGroup('primaryDiagnosis', 'Primary Diagnosis', [...PATIENT_PRIMARY_DIAGNOSIS], data, updateData, true)}
+      {radioGroup('primaryDiagnosis', 'Primary Diagnosis', [...PATIENT_PRIMARY_DIAGNOSIS], data, updatePrimaryDiagnosis, true)}
       {textInput('ageAtDiagnosis', 'Age at Diagnosis', 'number', data, updateData, true)}
     </Grid2>
     <div>
@@ -776,6 +829,7 @@ export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
         </div>
       </FieldSection>
     )}
+    {(diagnosis === 'Ulcerative Colitis' || diagnosis === "Crohn's Disease") && (
     <FieldSection label="Montreal Classification">
       <div style={{
         display: 'flex',
@@ -808,40 +862,54 @@ export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
         </span>
       </div>
       <ColumnStack>
-        {radioGroup(
-          'montrealAgeAtDiagnosis',
-          'Age at Diagnosis',
-          [...MONTREAL_AGE_AT_DIAGNOSIS],
-          data,
-          updateMontrealField,
-          isMontrealFieldRequired(diagnosis, 'montrealAgeAtDiagnosis'),
-        )}
-        {radioGroup(
-          'diseaseLocation',
-          'Location of the disease',
-          [...DISEASE_LOCATIONS],
-          data,
-          updateMontrealField,
-          isMontrealFieldRequired(diagnosis, 'diseaseLocation'),
-        )}
-        {radioGroup(
-          'diseaseBehavior',
-          'Behavior',
-          [...DISEASE_BEHAVIORS],
-          data,
-          updateMontrealField,
-          isMontrealFieldRequired(diagnosis, 'diseaseBehavior'),
-        )}
-        {radioGroup(
-          'perianalDisease',
-          'Perianal',
-          [...PERIANAL_OPTIONS],
-          data,
-          updateMontrealField,
-          isMontrealFieldRequired(diagnosis, 'perianalDisease'),
-        )}
+        {isMontrealFieldVisible(diagnosis, 'montrealAgeAtDiagnosis') &&
+          radioGroup(
+            'montrealAgeAtDiagnosis',
+            'Age at Diagnosis',
+            [...MONTREAL_AGE_AT_DIAGNOSIS],
+            data,
+            updateMontrealField,
+            isMontrealFieldRequired(diagnosis, 'montrealAgeAtDiagnosis'),
+          )}
+        {isMontrealFieldVisible(diagnosis, 'ucExtent') &&
+          radioGroup(
+            'ucExtent',
+            'Extent of UC',
+            [...UC_EXTENT_OPTIONS],
+            data,
+            updateMontrealField,
+            isMontrealFieldRequired(diagnosis, 'ucExtent'),
+          )}
+        {isMontrealFieldVisible(diagnosis, 'diseaseLocation') &&
+          radioGroup(
+            'diseaseLocation',
+            'Location of the disease',
+            [...DISEASE_LOCATIONS],
+            data,
+            updateMontrealField,
+            isMontrealFieldRequired(diagnosis, 'diseaseLocation'),
+          )}
+        {isMontrealFieldVisible(diagnosis, 'diseaseBehavior') &&
+          radioGroup(
+            'diseaseBehavior',
+            'Behavior',
+            [...DISEASE_BEHAVIORS],
+            data,
+            updateMontrealField,
+            isMontrealFieldRequired(diagnosis, 'diseaseBehavior'),
+          )}
+        {isMontrealFieldVisible(diagnosis, 'perianalDisease') &&
+          radioGroup(
+            'perianalDisease',
+            'Perianal',
+            [...PERIANAL_OPTIONS],
+            data,
+            updateMontrealField,
+            isMontrealFieldRequired(diagnosis, 'perianalDisease'),
+          )}
       </ColumnStack>
     </FieldSection>
+    )}
     {data.primaryDiagnosis === "Crohn's Disease" && (
       <FieldBox label="Perianal Disease Assessment">
         <textarea

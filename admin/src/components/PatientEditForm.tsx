@@ -483,6 +483,7 @@ export default function PatientEditForm({ patient }: { patient: PatientWithUser 
                 <div className="pr-field-section-title">Montreal Classification</div>
                 <div className="pr-field-grid">
                   {renderField('Age at Diagnosis', 'montrealAgeAtDiagnosis')}
+                  {renderField('Extent of UC', 'ucExtent')}
                   {renderField('Location of the disease', 'diseaseLocation')}
                   {renderField('Behavior', 'diseaseBehavior')}
                   {renderField('Perianal', 'perianalDisease')}

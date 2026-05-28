@@ -1,17 +1,17 @@
-/** Extract Montreal code (A1, L1, B1, P) from a known radio label value only. */
+/** Extract Montreal code (A1, E1, L1, B1, P) from a known radio label value only. */
 export function extractMontrealCode(value: string): string | null {
   const t = value.trim();
   if (!t || t === 'No') return null;
 
-  const parenMatch = t.match(/^([ABLP]\d*)\s*\(/);
+  const parenMatch = t.match(/^([ABEPL]\d*)\s*\(/);
   if (parenMatch) return parenMatch[1];
 
-  const dashMatch = t.match(/^([ABL]\d+)-/i);
+  const dashMatch = t.match(/^([ABEL]\d+)-/i);
   if (dashMatch) return dashMatch[1].toUpperCase();
 
   if (t === 'P (Yes)') return 'P';
 
-  if (/^[ABLP]\d+$/.test(t)) return t;
+  if (/^[ABEPL]\d+$/.test(t)) return t;
 
   return null;
 }
@@ -19,6 +19,7 @@ export function extractMontrealCode(value: string): string | null {
 export function hasMontrealSelections(fields: MontrealFieldValues): boolean {
   return [
     fields.montrealAgeAtDiagnosis,
+    fields.ucExtent,
     fields.diseaseLocation,
     fields.diseaseBehavior,
     fields.perianalDisease,
@@ -27,23 +28,26 @@ export function hasMontrealSelections(fields: MontrealFieldValues): boolean {
 
 export type MontrealFieldValues = {
   montrealAgeAtDiagnosis?: unknown;
+  ucExtent?: unknown;
   diseaseLocation?: unknown;
   diseaseBehavior?: unknown;
   perianalDisease?: unknown;
 };
 
-/** Build display string e.g. "A1 - L1 - B1" (and "P" when perianal is yes). */
+/** Build display string e.g. "A1 - E2" (UC) or "A1 - L1 - B1" (CD, and "P" when perianal is yes). */
 export function composeMontrealClass(fields: MontrealFieldValues): string {
   if (!hasMontrealSelections(fields)) return '';
 
   const codes: string[] = [];
 
   const age = extractMontrealCode(String(fields.montrealAgeAtDiagnosis ?? ''));
+  const extent = extractMontrealCode(String(fields.ucExtent ?? ''));
   const location = extractMontrealCode(String(fields.diseaseLocation ?? ''));
   const behavior = extractMontrealCode(String(fields.diseaseBehavior ?? ''));
   const perianal = extractMontrealCode(String(fields.perianalDisease ?? ''));
 
   if (age) codes.push(age);
+  if (extent) codes.push(extent);
   if (location) codes.push(location);
   if (behavior) codes.push(behavior);
   if (perianal) codes.push(perianal);
@@ -67,6 +71,9 @@ export function montrealValidationMissing(
     if (!isNonEmpty(fields.montrealAgeAtDiagnosis)) {
       missing.push('Age at Diagnosis (Montreal)');
     }
+    if (!isNonEmpty(fields.ucExtent)) {
+      missing.push('Extent of UC');
+    }
     return missing;
   }
 
@@ -88,6 +95,39 @@ export function isMontrealFieldRequired(
   if (field === 'montrealAgeAtDiagnosis') {
     return diagnosis === 'Ulcerative Colitis' || diagnosis === "Crohn's Disease";
   }
+  if (field === 'ucExtent') {
+    return diagnosis === 'Ulcerative Colitis';
+  }
   if (diagnosis !== "Crohn's Disease") return false;
   return field === 'diseaseLocation' || field === 'diseaseBehavior' || field === 'perianalDisease';
+}
+
+export function isMontrealFieldVisible(
+  primaryDiagnosis: unknown,
+  field: keyof MontrealFieldValues,
+): boolean {
+  const diagnosis = String(primaryDiagnosis ?? '').trim();
+  if (field === 'montrealAgeAtDiagnosis') {
+    return diagnosis === 'Ulcerative Colitis' || diagnosis === "Crohn's Disease";
+  }
+  if (field === 'ucExtent') {
+    return diagnosis === 'Ulcerative Colitis';
+  }
+  return diagnosis === "Crohn's Disease";
+}
+
+/** Montreal summary codes depend on diagnosis (UC uses age + extent). */
+export function montrealFieldsForDiagnosis(
+  primaryDiagnosis: unknown,
+  fields: MontrealFieldValues,
+): MontrealFieldValues {
+  const diagnosis = String(primaryDiagnosis ?? '').trim();
+  if (diagnosis === "Crohn's Disease") return fields;
+  if (diagnosis === 'Ulcerative Colitis') {
+    return {
+      montrealAgeAtDiagnosis: fields.montrealAgeAtDiagnosis,
+      ucExtent: fields.ucExtent,
+    };
+  }
+  return { montrealAgeAtDiagnosis: fields.montrealAgeAtDiagnosis };
 }

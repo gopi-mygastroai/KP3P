@@ -97,6 +97,7 @@ export const IBD_INVESTIGATION_GROUPS = [
     title: 'DRUG MONITORING (Thiopurines)',
     fields: [
       { id: 'tpmt', label: 'TPMT Level / Activity' },
+      { id: 'nudt', label: 'NUDT Level / Activity' },
       { id: 'tgn6', label: '6-Thioguanine Nucleotides (6-TGN)' },
       { id: 'mmp6', label: '6-Methylmercaptopurine (6-MMP)' },
     ],

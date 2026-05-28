@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { composeMontrealClass, hasMontrealSelections } from '@/lib/montreal-classification';
+import { composeMontrealClass, hasMontrealSelections, montrealFieldsForDiagnosis } from '@/lib/montreal-classification';
 import { formatSmokingSummary } from '@/lib/smoking';
 import { filledInvestigationEntries, parseIbdInvestigations } from '@/lib/ibd-investigations';
 import PatientActions from '../../../../components/PatientActions';
@@ -49,7 +49,7 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
   const investigationEntries = filledInvestigationEntries(investigationData);
 
   const montrealClassDisplay = hasMontrealSelections(patient)
-    ? composeMontrealClass(patient)
+    ? composeMontrealClass(montrealFieldsForDiagnosis(patient.primaryDiagnosis, patient))
     : '';
 
   const activityColor: Record<string, string> = {
@@ -473,18 +473,28 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
                       <div className="pr-field-label">Age at Diagnosis</div>
                       <div className="pr-field-value">{patient.montrealAgeAtDiagnosis || '—'}</div>
                     </div>
-                    <div className="pr-field">
-                      <div className="pr-field-label">Location of the disease</div>
-                      <div className="pr-field-value">{patient.diseaseLocation || '—'}</div>
-                    </div>
-                    <div className="pr-field">
-                      <div className="pr-field-label">Behavior</div>
-                      <div className="pr-field-value">{patient.diseaseBehavior || '—'}</div>
-                    </div>
-                    <div className="pr-field">
-                      <div className="pr-field-label">Perianal</div>
-                      <div className="pr-field-value">{patient.perianalDisease || '—'}</div>
-                    </div>
+                    {patient.primaryDiagnosis === 'Ulcerative Colitis' && (
+                      <div className="pr-field">
+                        <div className="pr-field-label">Extent of UC</div>
+                        <div className="pr-field-value">{patient.ucExtent || '—'}</div>
+                      </div>
+                    )}
+                    {patient.primaryDiagnosis === "Crohn's Disease" && (
+                      <>
+                        <div className="pr-field">
+                          <div className="pr-field-label">Location of the disease</div>
+                          <div className="pr-field-value">{patient.diseaseLocation || '—'}</div>
+                        </div>
+                        <div className="pr-field">
+                          <div className="pr-field-label">Behavior</div>
+                          <div className="pr-field-value">{patient.diseaseBehavior || '—'}</div>
+                        </div>
+                        <div className="pr-field">
+                          <div className="pr-field-label">Perianal</div>
+                          <div className="pr-field-value">{patient.perianalDisease || '—'}</div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="pr-field">

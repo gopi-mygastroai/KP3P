@@ -1,7 +1,7 @@
 /** Build Prisma Patient.create `data` from intake JSON (handles MultiStepForm pre-stringified arrays). */
 
 import type { Prisma } from '@prisma/client';
-import { composeMontrealClass, hasMontrealSelections } from '@/lib/montreal-classification';
+import { composeMontrealClass, hasMontrealSelections, montrealFieldsForDiagnosis } from '@/lib/montreal-classification';
 import { normalizeSesCdScoring, parseSesCdScoring, serializeSesCdScoring } from '@/lib/ses-cd-scoring';
 import {
   normalizeUcEndoscopicScoring,
@@ -114,10 +114,13 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
       typeof b.perianalDiseaseAssessment === 'string' ? b.perianalDiseaseAssessment.trim() : '',
     montrealAgeAtDiagnosis:
       typeof b.montrealAgeAtDiagnosis === 'string' ? b.montrealAgeAtDiagnosis : '',
+    ucExtent: typeof b.ucExtent === 'string' ? b.ucExtent : '',
     diseaseLocation: typeof b.diseaseLocation === 'string' ? b.diseaseLocation : '',
     diseaseBehavior: typeof b.diseaseBehavior === 'string' ? b.diseaseBehavior : '',
     perianalDisease: typeof b.perianalDisease === 'string' ? b.perianalDisease : '',
-    montrealClass: hasMontrealSelections(b) ? composeMontrealClass(b) : '',
+    montrealClass: hasMontrealSelections(b)
+      ? composeMontrealClass(montrealFieldsForDiagnosis(b.primaryDiagnosis, b))
+      : '',
     sesCdScoring: serializeSesCdScoring(normalizeSesCdScoring(parseSesCdScoring(b.sesCdScoring))),
     sesCdClinicalNotes:
       typeof b.sesCdClinicalNotes === 'string' ? b.sesCdClinicalNotes.trim() : '',

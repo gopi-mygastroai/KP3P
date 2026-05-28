@@ -50,6 +50,7 @@ async function main() {
           diseaseDuration: patient.diseaseDuration || '',
           perianalDiseaseAssessment: patient.perianalDiseaseAssessment || '',
           montrealAgeAtDiagnosis: patient.montrealAgeAtDiagnosis || '',
+          ucExtent: patient.ucExtent || '',
           diseaseLocation: patient.diseaseLocation || '',
           diseaseBehavior: patient.diseaseBehavior || '',
           perianalDisease: patient.perianalDisease || '',
