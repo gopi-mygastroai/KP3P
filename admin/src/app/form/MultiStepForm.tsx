@@ -103,7 +103,6 @@ export default function MultiStepForm() {
     const payload = {
       ...formData,
       previousSurgeries: JSON.stringify(formData.previousSurgeries),
-      previousTreatmentsTried: JSON.stringify(formData.previousTreatmentsTried),
       comorbidities: JSON.stringify(formData.comorbidities),
       // Ensure numeric fields
       currentAge: Number(formData.currentAge) || 0,

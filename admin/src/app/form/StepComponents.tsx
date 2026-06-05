@@ -1,6 +1,4 @@
-import type { FormData, IntakeUploadedDocument } from './formData';
-import { getErrorMessage } from '@/lib/get-error-message';
-import { useRef, useState } from 'react';
+import type { FormData } from './formData';
 
 interface StepProps {
   data: FormData;
@@ -142,7 +140,8 @@ export function Step2({ data, updateData }: StepProps) {
         {textInput('hepatitisA', 'Hepatitis A', 'text', data, updateData)}
         {textInput('hepatitisE', 'Hepatitis E', 'text', data, updateData)}
         {textInput('zoster', 'Zoster', 'text', data, updateData)}
-        {textInput('mmrVaricella', 'MMR / Varicella', 'text', data, updateData)}
+        {textInput('mmr', 'MMR', 'text', data, updateData)}
+        {textInput('varicella', 'Varicella', 'text', data, updateData)}
         {textInput('tetanusTdap', 'Tetanus / Tdap', 'text', data, updateData)}
       </div>
     </div>
@@ -150,107 +149,11 @@ export function Step2({ data, updateData }: StepProps) {
 }
 
 export function Step3({ data, updateData }: StepProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('patientName', String(data.name || ''));
-      formData.append('mrn', String(data.mrn || ''));
-      
-      const res = await fetch('/api/drive/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      const responseData = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(responseData.error || 'Failed to upload to Google Drive');
-      }
-
-      const newDoc: IntakeUploadedDocument = {
-        name: responseData.driveFileName || file.name,
-        originalName: file.name,
-        type: file.type,
-        url: responseData.webViewLink,
-        fileId: responseData.fileId,
-      };
-
-      const currentDocs: IntakeUploadedDocument[] = Array.isArray(data.documents) ? data.documents : [];
-      updateData({ documents: [...currentDocs, newDoc] });
-    } catch (err: unknown) {
-      alert(
-        'Upload failed: ' +
-          getErrorMessage(err) +
-          '\n\nMake sure your .env has Google Drive credentials configured.',
-      );
-    } finally {
-      setUploading(false);
-    }
-  };
-
   return (
     <div className="animate-fade-in">
-      <h2 className="text-xl mb-4 text-white font-bold">Health Records & Documents</h2>
-      
-      <h3 className="text-lg mt-2 mb-2 text-primary-color">Health Records</h3>
+      <h2 className="text-xl mb-4 text-white font-bold">Health Records</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {textInput('dateMostRecentLabs', 'Date of Most Recent Labs', 'date', data, updateData)}
-      </div>
-
-      <h3 className="text-lg mt-6 mb-4 text-primary-color border-t border-slate-700 pt-4">Documents (Upload / Camera)</h3>
-      <div className="form-group bg-slate-800/50 p-6 rounded-xl border border-dashed border-teal-500/30">
-        <div className="flex flex-col items-center justify-center gap-4">
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileUpload}
-            className="hidden" 
-            accept="image/*,application/pdf"
-            capture="environment"
-          />
-          <button 
-            type="button" 
-            onClick={() => fileInputRef.current?.click()}
-            className="btn btn-secondary w-full max-w-xs flex gap-2 items-center justify-center"
-            disabled={uploading}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-            {uploading ? 'Uploading...' : 'Upload Image or PDF'}
-          </button>
-          
-          {Array.isArray(data.documents) && data.documents.length > 0 && (
-            <div className="w-full mt-4 text-left">
-              <p className="text-sm font-semibold text-gray-400 mb-2">Attached Documents:</p>
-              <ul className="space-y-2">
-                {data.documents.map((doc: IntakeUploadedDocument, i: number) => (
-                  <li key={i} className="flex justify-between items-center bg-slate-800 px-3 py-2 rounded-lg text-sm text-gray-200">
-                    <span className="truncate max-w-[200px]">{doc.name}</span>
-                    <button 
-                      type="button"
-                      className="text-red-400 hover:text-red-300"
-                      onClick={() => {
-                        const newDocs = [...data.documents];
-                        newDocs.splice(i, 1);
-                        updateData({ documents: newDocs });
-                      }}
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

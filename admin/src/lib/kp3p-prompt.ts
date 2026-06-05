@@ -12,8 +12,7 @@ export interface PatientData {
   severity: string; duration: string; ageAtDx: number; priorSurgeries?: string;
   bowelFreq: string; bloodInStool: string; abdPain: string; weightLoss: string;
   hb: string; tlc: string; platelets: string; crp: string; albumin: string;
-  mayoScore: string; endoscopyFindings: string; imagingFindings: string;
-  dexa: string; currentMeds: string; treatmentResponse: string; tdm: string;
+  mayoScore: string; treatmentResponse: string;
   priorFailed: string; tbStatus: string; hbsAg: string; antiHBs: string;
   antiHBc: string; antiHCV: string; antiHIV: string;
   comorbidities?: string[]; eim?: string; specialNotes?: string[];
@@ -33,9 +32,6 @@ export interface PatientData {
   vaccineMmr?: string;
   vaccineVaricella?: string;
   specialConsiderations?: string;
-  steroidUse?: string;
-  currentSupplements?: string;
-  previousTreatmentsTried?: string;
   pregnancyPlanning?: string;
   activityScore?: string;
   impactOnQoL?: string;
@@ -46,9 +42,6 @@ export interface PatientData {
   upperGiFindings?: string;
   ucEndoscopicScoring?: string;
   sesCdClinicalNotes?: string;
-  colonoscopyFindings?: string;
-  recentImaging?: string;
-  mostRecentDexaScan?: string;
   montrealAgeAtDiagnosis?: string;
   ucExtent?: string;
   diseaseLocation?: string;
@@ -84,22 +77,16 @@ function vaccineStatus(patient: PatientData, key: keyof NonNullable<PatientData[
 }
 
 function patientContext(patient: PatientData) {
-  const medicationHistory = formatMedicationHistoryForPrompt(
-    patient.currentIbdMedicationsRows,
-    patient.currentMeds,
-  );
+  const medicationHistory = formatMedicationHistoryForPrompt(patient.currentIbdMedicationsRows);
   const endoscopicSummary = formatEndoscopicDataForPrompt({
     sesCdScoring: patient.sesCdScoring,
     upperGiFindings: patient.upperGiFindings,
     ucEndoscopicScoring: patient.ucEndoscopicScoring,
     sesCdClinicalNotes: patient.sesCdClinicalNotes,
-    colonoscopyFindings: patient.colonoscopyFindings,
-    endoscopyFindings: patient.endoscopyFindings,
   });
   const priorMedsAck = hasPriorMedicationHistory(
     patient.currentIbdMedicationsRows,
     patient.priorFailed,
-    patient.previousTreatmentsTried,
   );
 
   return {
@@ -146,7 +133,7 @@ RULES:
   <tr><td><b>Current</b></td><td>[Drug name]</td><td>[Dose / Duration]</td><td>Active</td><td>—</td></tr>
   <tr><td><b>Prior</b></td><td>[Drug name]</td><td>[Dose / Duration]</td><td>Stopped</td><td>[Primary NR / Secondary LOR / Side effect / Remission]</td></tr>
 </table>
-<p><b>Steroid Exposure:</b> [Number of courses] courses | Last course: [Date] | Steroid dependent: Yes / No (source: ${patient.steroidUse || 'Not documented'})</p>
+<p><b>Steroid Exposure:</b> [Number of courses] courses | Last course: [Date] | Steroid dependent: Yes / No (derive from medication history table)</p>
 <p><b>Immunosuppression Level at Presentation:</b> None / Low / Moderate / High</p>
 <p><b>Biologic-naive:</b> Yes / No | <b>Prior biologic failures:</b> [Number and agents]</p>
 <p><b>Clinical Implication:</b> [One sentence on how medication history impacts risk level and treatment selection]</p>
@@ -374,11 +361,8 @@ Severity: ${patient.severity} | Activity score: ${patient.activityScore ?? 'N/A'
 Pain: ${patient.abdPain ?? 'N/A'} | QoL impact: ${patient.impactOnQoL ?? 'N/A'} | Weight Loss: ${patient.weightLoss ?? 'N/A'}
 Labs / Investigations: ${labsLine(patient)}
 Endoscopic data: ${ctx.endoscopicSummary}
-Imaging: ${patient.recentImaging || patient.imagingFindings || 'None'} | DEXA: ${patient.mostRecentDexaScan || patient.dexa || 'Not done'}
 Medication history (structured): ${ctx.medicationHistory}
-Treatment response: ${patient.treatmentResponse ?? 'N/A'} | TDM: ${patient.tdm ?? 'N/A'} | Steroid use: ${patient.steroidUse ?? 'Not documented'}
-Prior treatments tried: ${patient.previousTreatmentsTried ?? 'None'} | Failed treatment details: ${patient.priorFailed ?? 'None'}
-Supplements: ${patient.currentSupplements ?? 'None'}
+Treatment response: ${patient.treatmentResponse ?? 'N/A'} | Failed treatment details: ${patient.priorFailed ?? 'None'}
 TB: ${patient.tbStatus ?? 'Not documented'} | HBsAg: ${patient.hbsAg ?? 'Not tested'} | Anti-HBs: ${patient.antiHBs ?? 'Not tested'} | Anti-HBc: ${patient.antiHBc ?? 'Not tested'}
 Anti-HCV: ${patient.antiHCV ?? 'Not tested'} | Anti-HIV: ${patient.antiHIV ?? 'Not tested'}
 Vaccines — Influenza: ${vaccineStatus(patient, 'influenza', patient.vaccineInfluenza)} | COVID: ${vaccineStatus(patient, 'covid19', patient.vaccineCovid)} | Pneumococcal: ${vaccineStatus(patient, 'pneumococcal', patient.vaccinePneumococcal)}

@@ -1,12 +1,3 @@
-/** Uploaded lab / document metadata from Drive (Step 3). */
-export type IntakeUploadedDocument = {
-  name: string;
-  originalName: string;
-  type: string;
-  url?: string;
-  fileId?: string;
-};
-
 export const initialFormData = {
   // Step 1
   name: '',
@@ -37,16 +28,6 @@ export const initialFormData = {
 
   // Step 4
   dateMostRecentLabs: '',
-  documents: [] as IntakeUploadedDocument[],
-
-  // Step 5
-  currentIbdMedications: '',
-  failedTreatments: '',
-  tdmResults: '',
-  currentSupplements: '',
-  responseToTreatment: '',
-  steroidUse: '',
-  previousTreatmentsTried: [] as string[],
 
   // Step 6
   tbScreening: '',
@@ -62,7 +43,8 @@ export const initialFormData = {
   hepatitisA: '',
   hepatitisE: '',
   zoster: '',
-  mmrVaricella: '',
+  mmr: '',
+  varicella: '',
   tetanusTdap: '',
 
   // Step 7

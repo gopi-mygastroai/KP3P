@@ -33,11 +33,6 @@ function parseJsonStringArray(raw: unknown): string[] {
   return [];
 }
 
-function joinJsonArray(raw: unknown): string | undefined {
-  const items = parseJsonStringArray(raw);
-  return items.length ? items.join(', ') : undefined;
-}
-
 function toKP3PPatient(patient: PatientWithUser): PatientData {
   const labs = { hb: '', tlc: '', platelets: '', crp: '', albumin: '' };
   const comorbidities = parseJsonStringArray(patient.comorbidities);
@@ -46,7 +41,6 @@ function toKP3PPatient(patient: PatientWithUser): PatientData {
     : undefined;
   const specialNotes = specialConsiderationsRaw ? [specialConsiderationsRaw] : undefined;
   const surg = parseJsonStringArray(patient.previousSurgeries);
-  const priorTreatments = joinJsonArray(patient.previousTreatmentsTried);
   return {
     name: patient.name || '',
     id: String(patient.id ?? ''),
@@ -71,16 +65,8 @@ function toKP3PPatient(patient: PatientWithUser): PatientData {
     weightLoss: patient.weightLoss || '',
     ...labs,
     mayoScore: patient.activityScore || '',
-    endoscopyFindings: patient.colonoscopyFindings || '',
-    imagingFindings: patient.recentImaging || '',
-    dexa: patient.mostRecentDexaScan || '',
-    currentMeds: patient.currentIbdMedications || '',
     treatmentResponse: patient.responseToTreatment || '',
-    tdm: patient.tdmResults || '',
     priorFailed: patient.failedTreatments || '',
-    steroidUse: patient.steroidUse || undefined,
-    currentSupplements: patient.currentSupplements || undefined,
-    previousTreatmentsTried: priorTreatments,
     pregnancyPlanning: patient.pregnancyPlanning || undefined,
     activityScore: patient.activityScore || undefined,
     impactOnQoL: patient.impactOnQoL || undefined,
@@ -91,9 +77,6 @@ function toKP3PPatient(patient: PatientWithUser): PatientData {
     upperGiFindings: patient.upperGiFindings || undefined,
     ucEndoscopicScoring: patient.ucEndoscopicScoring || undefined,
     sesCdClinicalNotes: patient.sesCdClinicalNotes || undefined,
-    colonoscopyFindings: patient.colonoscopyFindings || undefined,
-    recentImaging: patient.recentImaging || undefined,
-    mostRecentDexaScan: patient.mostRecentDexaScan || undefined,
     montrealAgeAtDiagnosis: patient.montrealAgeAtDiagnosis || undefined,
     ucExtent: patient.ucExtent || undefined,
     diseaseLocation: patient.diseaseLocation || undefined,
@@ -119,7 +102,7 @@ function toKP3PPatient(patient: PatientWithUser): PatientData {
     vaccineHepE: vaccineForKP3Prompt(patient.hepatitisE),
     vaccineZoster: vaccineForKP3Prompt(patient.zoster),
     vaccineTetanus: vaccineForKP3Prompt(patient.tetanusTdap),
-    vaccineMmr: vaccineForKP3Prompt(patient.mmr || patient.mmrVaricella),
+    vaccineMmr: vaccineForKP3Prompt(patient.mmr),
     vaccineVaricella: vaccineForKP3Prompt(patient.varicella),
     vaccines: {
       influenza: vaccineForKP3Prompt(patient.influenza),
@@ -128,7 +111,7 @@ function toKP3PPatient(patient: PatientWithUser): PatientData {
       hepatitisA: vaccineForKP3Prompt(patient.hepatitisA),
       hepatitisB: vaccineForKP3Prompt(patient.hepatitisB),
       zoster: vaccineForKP3Prompt(patient.zoster),
-      mmr: vaccineForKP3Prompt(patient.mmr || patient.mmrVaricella),
+      mmr: vaccineForKP3Prompt(patient.mmr),
       varicella: vaccineForKP3Prompt(patient.varicella),
       tdap: vaccineForKP3Prompt(patient.tetanusTdap),
     },
@@ -183,12 +166,11 @@ Level:${patient.currentDiseaseActivity||''} BowelFreq:${patient.stoolFrequency||
 [LABS]
 MostRecentLabsDate:${patient.dateMostRecentLabs||'None'} InvestigationValues:${filledInvestigationEntries(parseIbdInvestigations(patient.ibdInvestigations)).map((entry)=>`${entry.label}=${entry.value}`).join('; ')||'None'}
 [TREATMENT]
-CurrentMeds:${patient.currentIbdMedications||'None'} Response:${patient.responseToTreatment||''} TDM:${patient.tdmResults||''} Steroids:${patient.steroidUse||''} Supplements:${patient.currentSupplements||''}
-PriorTx:${parseArray(patient.previousTreatmentsTried)} FailedTx:${patient.failedTreatments||''}
+MedicationRows:${patient.currentIbdMedicationsRows||'[]'} Response:${patient.responseToTreatment||''} FailedTx:${patient.failedTreatments||''}
 [SCREENING]
 TB:${patient.tbScreening||''} HBsAg:${patient.hepBSurfaceAg||''} AntiHBs:${patient.hepBSurfaceAb||''} AntiHBc:${patient.hepBCoreAb||''} AntiHCV:${patient.antiHcv||''} AntiHIV:${patient.antiHiv||''}
 [VACCINES]
-Influenza:${formatVaccineForDocExport(patient.influenza)} COVID19:${formatVaccineForDocExport(patient.covid19)} Pneumococcal:${formatVaccineForDocExport(patient.pneumococcal)} HepB:${formatVaccineForDocExport(patient.hepatitisB)} HepA:${formatVaccineForDocExport(patient.hepatitisA)} HepE:${formatVaccineForDocExport(patient.hepatitisE)} Zoster:${formatVaccineForDocExport(patient.zoster)} MMR:${formatVaccineForDocExport(patient.mmr || patient.mmrVaricella)} Varicella:${formatVaccineForDocExport(patient.varicella)} Tdap:${formatVaccineForDocExport(patient.tetanusTdap)}
+Influenza:${formatVaccineForDocExport(patient.influenza)} COVID19:${formatVaccineForDocExport(patient.covid19)} Pneumococcal:${formatVaccineForDocExport(patient.pneumococcal)} HepB:${formatVaccineForDocExport(patient.hepatitisB)} HepA:${formatVaccineForDocExport(patient.hepatitisA)} HepE:${formatVaccineForDocExport(patient.hepatitisE)} Zoster:${formatVaccineForDocExport(patient.zoster)} MMR:${formatVaccineForDocExport(patient.mmr)} Varicella:${formatVaccineForDocExport(patient.varicella)} Tdap:${formatVaccineForDocExport(patient.tetanusTdap)}
 [OTHER]
 Comorbidities:${parseArray(patient.comorbidities)} EIM:${patient.extraintestinalManif||'None'} Pregnancy:${patient.pregnancyPlanning||''} SpecialNotes:${patient.specialConsiderations||''}
 Format: 3-page concise care plan. Part1(Clinical Protocol):English. Part2(Patient Care Plan):${carePlanPrimaryPatientLanguage(patient.preferredLanguage)}`;

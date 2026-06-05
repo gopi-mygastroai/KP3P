@@ -29,7 +29,7 @@ function formatMedicationRowDetail(row: CurrentIbdMedicationRow): string {
 }
 
 /** Structured current/prior IBD medication rows for LLM (from assessment table). */
-export function formatMedicationHistoryForPrompt(rowsRaw: unknown, legacyText?: string): string {
+export function formatMedicationHistoryForPrompt(rowsRaw: unknown): string {
   const data = parseCurrentIbdMedications(rowsRaw);
   const relevant = data.rows.filter((row) => {
     const status = row.currentlyTaking.trim();
@@ -37,8 +37,7 @@ export function formatMedicationHistoryForPrompt(rowsRaw: unknown, legacyText?: 
   });
 
   if (relevant.length === 0) {
-    const legacy = legacyText?.trim();
-    return legacy ? `Legacy free-text meds: ${legacy}` : 'None documented';
+    return 'None documented';
   }
 
   const current = relevant.filter((r) => r.currentlyTaking === 'Yes');
@@ -73,8 +72,6 @@ export function formatEndoscopicDataForPrompt(input: {
   upperGiFindings?: unknown;
   ucEndoscopicScoring?: unknown;
   sesCdClinicalNotes?: string;
-  colonoscopyFindings?: string;
-  endoscopyFindings?: string;
 }): string {
   const parts: string[] = [];
 
@@ -101,19 +98,16 @@ export function formatEndoscopicDataForPrompt(input: {
     parts.push(`UC endoscopic: Mayo=${mayoTotal}, UCEIS total=${uceisTotalScore}`);
   }
 
-  if (input.colonoscopyFindings?.trim()) parts.push(`Colonoscopy: ${input.colonoscopyFindings.trim()}`);
-  if (input.endoscopyFindings?.trim()) parts.push(input.endoscopyFindings.trim());
   if (input.sesCdClinicalNotes?.trim()) parts.push(`Clinical notes: ${input.sesCdClinicalNotes.trim()}`);
 
   return parts.length ? parts.join(' | ') : 'Not provided';
 }
 
-export function hasPriorMedicationHistory(rowsRaw: unknown, priorFailed?: string, priorTreatments?: string): boolean {
+export function hasPriorMedicationHistory(rowsRaw: unknown, priorFailed?: string): boolean {
   const data = parseCurrentIbdMedications(rowsRaw);
   const stopped = data.rows.some((r) => r.currentlyTaking === 'Stopped');
   if (stopped) return true;
   if (priorFailed?.trim()) return true;
-  if (priorTreatments?.trim() && priorTreatments !== 'None') return true;
   return false;
 }
 

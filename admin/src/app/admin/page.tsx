@@ -175,6 +175,12 @@ export default async function AdminPage() {
             min-height: 44px;
           }
         }
+        .ad-card-heading {
+          display: flex;
+          align-items: baseline;
+          flex-wrap: wrap;
+          gap: 0.5em;
+        }
         .ad-card-title {
           font-size: 14px;
           font-weight: 600;

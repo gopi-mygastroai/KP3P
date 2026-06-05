@@ -70,36 +70,22 @@ function normalizePreferredLanguage(val: unknown): string {
   return '';
 }
 
-/** Patient Health Records step: rows of { date, document } → scalar date + documents JSON with labDate on each. */
-function labsAndDocumentsFromBody(b: Record<string, unknown>): {
-  dateMostRecentLabs: string;
-  documents: unknown;
-} {
+/** Patient Health Records step: rows of { date, document } → most recent lab date. */
+function dateMostRecentLabsFromBody(b: Record<string, unknown>): string {
   if (Array.isArray(b.labReportRows) && b.labReportRows.length > 0) {
     const rows = b.labReportRows as Array<{ date?: string; document?: Record<string, unknown> | null }>;
     const completed = rows.filter((r) => String(r.date || '').trim() && r.document);
-    let dateMostRecentLabs = '';
     if (completed.length > 0) {
-      dateMostRecentLabs = completed.reduce(
-        (max, r) => (String(r.date) > max ? String(r.date) : max),
-        '',
-      );
+      return completed.reduce((max, r) => (String(r.date) > max ? String(r.date) : max), '');
     }
-    const documents = completed.map((r) => ({
-      ...r.document,
-      labDate: r.date,
-    }));
-    return { dateMostRecentLabs, documents };
+    return '';
   }
-  return {
-    dateMostRecentLabs: typeof b.dateMostRecentLabs === 'string' ? b.dateMostRecentLabs : '',
-    documents: b.documents,
-  };
+  return typeof b.dateMostRecentLabs === 'string' ? b.dateMostRecentLabs : '';
 }
 
 export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma.PatientCreateInput {
   const b = body;
-  const { dateMostRecentLabs, documents } = labsAndDocumentsFromBody(b);
+  const dateMostRecentLabs = dateMostRecentLabsFromBody(b);
   return {
     name: typeof b.name === 'string' ? b.name : '',
     email: typeof b.email === 'string' ? b.email.trim() : '',
@@ -144,22 +130,12 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
     weightLoss: typeof b.weightLoss === 'string' ? b.weightLoss : '',
     activityScore: typeof b.activityScore === 'string' ? b.activityScore : '',
     dateMostRecentLabs,
-    recentLabValues: typeof b.recentLabValues === 'string' ? b.recentLabValues : '',
     ibdInvestigations: serializeIbdInvestigations(normalizeIbdInvestigations(parseIbdInvestigations(b.ibdInvestigations))),
-    dateMostRecentColonoscopy: typeof b.dateMostRecentColonoscopy === 'string' ? b.dateMostRecentColonoscopy : '',
-    colonoscopyFindings: typeof b.colonoscopyFindings === 'string' ? b.colonoscopyFindings : '',
-    recentImaging: typeof b.recentImaging === 'string' ? b.recentImaging : '',
-    mostRecentDexaScan: typeof b.mostRecentDexaScan === 'string' ? b.mostRecentDexaScan : '',
-    currentIbdMedications: typeof b.currentIbdMedications === 'string' ? b.currentIbdMedications : '',
     currentIbdMedicationsRows: serializeCurrentIbdMedications(
       normalizeCurrentIbdMedications(parseCurrentIbdMedications(b.currentIbdMedicationsRows)),
     ),
     failedTreatments: typeof b.failedTreatments === 'string' ? b.failedTreatments : '',
-    tdmResults: typeof b.tdmResults === 'string' ? b.tdmResults : '',
-    currentSupplements: typeof b.currentSupplements === 'string' ? b.currentSupplements : '',
     responseToTreatment: typeof b.responseToTreatment === 'string' ? b.responseToTreatment : '',
-    steroidUse: typeof b.steroidUse === 'string' ? b.steroidUse : '',
-    previousTreatmentsTried: normalizeJsonArray(b.previousTreatmentsTried),
     tbScreening: typeof b.tbScreening === 'string' ? b.tbScreening : '',
     hepBSurfaceAg: typeof b.hepBSurfaceAg === 'string' ? b.hepBSurfaceAg : '',
     hepBSurfaceAb: typeof b.hepBSurfaceAb === 'string' ? b.hepBSurfaceAb : '',
@@ -175,7 +151,6 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
     zoster: normalizeJsonObject(b.zoster),
     mmr: normalizeJsonObject(b.mmr),
     varicella: normalizeJsonObject(b.varicella),
-    mmrVaricella: normalizeJsonObject(b.mmrVaricella),
     tetanusTdap: normalizeJsonObject(b.tetanusTdap),
     comorbidities: normalizeJsonArray(b.comorbidities),
     extraintestinalManif: normalizeExtrinsicManifestations(b.extraintestinalManif),
@@ -183,7 +158,6 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
     preferredLanguage: normalizePreferredLanguage(b.preferredLanguage),
     occupation: typeof b.occupation === 'string' ? b.occupation : '',
     specialConsiderations: typeof b.specialConsiderations === 'string' ? b.specialConsiderations : '',
-    documents: normalizeJsonArray(documents),
     assessmentComplete: b.assessmentComplete === true,
     assessmentCurrentStep: (() => {
       const n = parseInt(String(b.assessmentCurrentStep ?? ''), 10);

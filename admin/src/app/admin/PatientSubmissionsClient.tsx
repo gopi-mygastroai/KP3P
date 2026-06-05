@@ -85,8 +85,8 @@ export default function PatientSubmissionsClient({ patients }: { patients: Patie
 
       <div className="ad-card">
         <div className="ad-card-header">
-          <div>
-            <span className="ad-card-title block mb-1">All Submissions</span>
+          <div className="ad-card-heading">
+            <span className="ad-card-title">All Submissions</span>
             <span className="ad-card-count">
               {query.trim()
                 ? `${filtered.length} of ${total} ${total === 1 ? 'record' : 'records'}`
@@ -110,7 +110,6 @@ export default function PatientSubmissionsClient({ patients }: { patients: Patie
                 <th>Date</th>
                 <th>Patient Name</th>
                 <th>MRN</th>
-                <th>Submitter</th>
                 <th>Diagnosis</th>
                 <th>Activity</th>
                 <th>Age</th>
@@ -120,13 +119,13 @@ export default function PatientSubmissionsClient({ patients }: { patients: Patie
             <tbody>
               {total === 0 ? (
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={8}>
                     <div className="ad-empty">No submissions yet.</div>
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={8}>
                     <div className="ad-empty">No patients match your search.</div>
                   </td>
                 </tr>
@@ -144,9 +143,6 @@ export default function PatientSubmissionsClient({ patients }: { patients: Patie
                         </div>
                       </td>
                       <td className="td-mrn">{p.mrn || '—'}</td>
-                      <td className="td-email" title={p.submitterEmail ?? undefined}>
-                        {p.submitterEmail || 'Unknown'}
-                      </td>
                       <td className="td-dx">{p.primaryDiagnosis || '—'}</td>
                       <td>
                         <span
@@ -223,8 +219,6 @@ export default function PatientSubmissionsClient({ patients }: { patients: Patie
                   </div>
                   <div className="ad-mobile-card-meta">
                     <strong style={{ color: '#334155' }}>Diagnosis:</strong> {p.primaryDiagnosis || '—'}
-                    <br />
-                    <strong style={{ color: '#334155' }}>Submitter:</strong> {p.submitterEmail || 'Unknown'}
                   </div>
                   <div className="ad-mobile-card-actions">
                     <a href={`/admin/patient/${p.id}`}>View details</a>

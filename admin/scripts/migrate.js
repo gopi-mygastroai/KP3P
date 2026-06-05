@@ -69,15 +69,10 @@ async function main() {
           weightLoss: patient.weightLoss || '',
           
           dateMostRecentLabs: patient.dateMostRecentLabs || '',
-
-          currentIbdMedications: patient.currentIbdMedications || '',
+          ibdInvestigations: patient.ibdInvestigations || '{}',
           currentIbdMedicationsRows: patient.currentIbdMedicationsRows || '[]',
           failedTreatments: patient.failedTreatments || '',
-          tdmResults: patient.tdmResults || '',
-          currentSupplements: patient.currentSupplements || '',
           responseToTreatment: patient.responseToTreatment || '',
-          steroidUse: patient.steroidUse || '',
-          previousTreatmentsTried: patient.previousTreatmentsTried || '[]',
           
           tbScreening: patient.tbScreening || '',
           hepBSurfaceAg: patient.hepBSurfaceAg || '',
@@ -93,7 +88,8 @@ async function main() {
           hepatitisA: patient.hepatitisA || '',
           hepatitisE: patient.hepatitisE || '',
           zoster: patient.zoster || '',
-          mmrVaricella: patient.mmrVaricella || '',
+          mmr: patient.mmr || '{}',
+          varicella: patient.varicella || '{}',
           tetanusTdap: patient.tetanusTdap || '',
           
           comorbidities: patient.comorbidities || '[]',

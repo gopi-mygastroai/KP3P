@@ -39,16 +39,6 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
     /* keep string */
   }
 
-  let previousTreatmentsTried: string | string[] = patient.previousTreatmentsTried;
-  try {
-    if (typeof previousTreatmentsTried === 'string') {
-      const p = JSON.parse(previousTreatmentsTried) as unknown;
-      previousTreatmentsTried = Array.isArray(p) ? (p as string[]) : previousTreatmentsTried;
-    }
-  } catch {
-    /* keep string */
-  }
-
   let comorbidities: string | string[] = patient.comorbidities;
   try {
     if (typeof comorbidities === 'string') {
@@ -57,18 +47,6 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
     }
   } catch {
     /* keep string */
-  }
-
-  let documents: unknown = patient.documents ?? '[]';
-  if (typeof documents === 'string') {
-    try {
-      const p = JSON.parse(documents) as unknown;
-      documents = Array.isArray(p) ? p : [];
-    } catch {
-      documents = [];
-    }
-  } else if (!Array.isArray(documents)) {
-    documents = [];
   }
 
   const montrealClass = hasMontrealSelections(patient)
@@ -94,26 +72,17 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
     normalizeCurrentIbdMedications(parseCurrentIbdMedications(patient.currentIbdMedicationsRows)),
   );
 
-  const mmr =
-    String(patient.mmr ?? '').trim() && patient.mmr !== '{}'
-      ? patient.mmr
-      : String(patient.mmrVaricella ?? '').trim() && patient.mmrVaricella !== '{}'
-        ? patient.mmrVaricella
-        : '{}';
-
   return {
     ...patient,
     previousSurgeries,
-    previousTreatmentsTried,
     comorbidities,
-    documents,
     montrealClass,
     sesCdScoring,
     upperGiFindings,
     ucEndoscopicScoring,
     ibdInvestigations,
     currentIbdMedicationsRows,
-    mmr,
+    mmr: patient.mmr ?? '{}',
     varicella: patient.varicella ?? '{}',
     smokingStatus: normalizeSmokingStatusForForm(patient.smokingStatus),
     smokingDetails: patient.smokingDetails ?? '',
@@ -157,20 +126,10 @@ const PATIENT_SAVE_FIELD_KEYS = [
   'weightLoss',
   'activityScore',
   'dateMostRecentLabs',
-  'recentLabValues',
   'ibdInvestigations',
-  'dateMostRecentColonoscopy',
-  'colonoscopyFindings',
-  'recentImaging',
-  'mostRecentDexaScan',
-  'currentIbdMedications',
   'currentIbdMedicationsRows',
   'failedTreatments',
-  'tdmResults',
-  'currentSupplements',
   'responseToTreatment',
-  'steroidUse',
-  'previousTreatmentsTried',
   'tbScreening',
   'hepBSurfaceAg',
   'hepBSurfaceAb',
@@ -186,7 +145,6 @@ const PATIENT_SAVE_FIELD_KEYS = [
   'zoster',
   'mmr',
   'varicella',
-  'mmrVaricella',
   'tetanusTdap',
   'comorbidities',
   'extraintestinalManif',
@@ -194,7 +152,6 @@ const PATIENT_SAVE_FIELD_KEYS = [
   'preferredLanguage',
   'occupation',
   'specialConsiderations',
-  'documents',
   'assessmentComplete',
   'assessmentCurrentStep',
 ] as const;

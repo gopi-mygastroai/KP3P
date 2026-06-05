@@ -63,21 +63,11 @@ weightLoss             String
 activityScore          String @default("")
 
 dateMostRecentLabs   String
-recentLabValues      String @default("")
 ibdInvestigations    String @default("{}")
-dateMostRecentColonoscopy String @default("")
-colonoscopyFindings  String @default("")
-recentImaging        String @default("")
-mostRecentDexaScan   String @default("")
 
-currentIbdMedications     String
 currentIbdMedicationsRows String @default("[]")
 failedTreatments          String
-tdmResults              String
-currentSupplements      String
 responseToTreatment     String
-steroidUse              String
-previousTreatmentsTried String
 
 tbScreening      String
 hepBSurfaceAg    String
@@ -95,7 +85,6 @@ hepatitisE       String
 zoster           String
 mmr              String @default("{}")
 varicella        String @default("{}")
-mmrVaricella     String
 tetanusTdap      String
 
 comorbidities         String
@@ -104,7 +93,6 @@ pregnancyPlanning     String
 preferredLanguage     String
 occupation            String
 specialConsiderations String
-documents             String? @default("[]")
 
 assessmentComplete Boolean @default(false)
 assessmentCurrentStep Int @default(1)
