@@ -8,20 +8,214 @@ import html2canvas from 'html2canvas';
 const DEFAULT_CARESHEET_FAILURE =
   'Care sheet generation failed. Please try again or contact support.';
 
-/** Injected into preview + off-screen PDF hosts so html2canvas always has rules (modal may unmount). */
 const KP3P_PREVIEW_STYLES = `
-  .kp3p-preview { outline: none; }
-  .kp3p-preview:focus { box-shadow: inset 0 0 0 2px rgba(59,130,246,0.3); border-radius: 4px; }
-  .kp3p-preview h2 { color: #1e3a8a; font-size: 24px; border-bottom: 2px solid #1e3a8a; padding-bottom: 8px; }
-  .kp3p-preview h3 { color: #2563eb; font-size: 18px; margin-top: 24px; }
-  .kp3p-preview h4 { color: #3b82f6; font-size: 16px; margin-top: 20px; }
-  .kp3p-preview h5 { color: #475569; font-size: 14px; margin-top: 16px; text-transform: uppercase; }
-  .kp3p-preview table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
-  .kp3p-preview th, .kp3p-preview td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
-  .kp3p-preview th { background-color: #f1f5f9; font-weight: bold; color: #1e293b; }
-  .kp3p-preview b { font-weight: 700; color: #0f172a; }
-  .kp3p-preview p { margin-bottom: 12px; }
+  /* ── Base ── */
+  .kp3p-preview * { box-sizing: border-box; }
+  .kp3p-preview {
+    outline: none;
+    font-family: -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    color: #0f172a;
+    line-height: 1.62;
+    background: #fff;
+  }
+  .kp3p-preview:focus {
+    box-shadow: inset 0 0 0 2px rgba(59,130,246,0.3);
+    border-radius: 4px;
+  }
+
+  /* ── Document title (h2) — professional gradient banner ── */
+  .kp3p-preview h2 {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #ffffff;
+    background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+    margin: 0 -52px 20px -52px;
+    padding: 15px 52px;
+    border: none;
+    page-break-after: avoid;
+    break-after: avoid;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  /* ── Major sections (h3) — prominent blue accent ── */
+  .kp3p-preview h3 {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #1e40af;
+    background: transparent;
+    margin: 18px 0 10px 0;
+    padding: 0 0 6px 0;
+    border: none;
+    border-bottom: 2px solid #1e40af;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  /* ── Sub-sections (h4) ── */
+  .kp3p-preview h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 16px 0 6px 0;
+    padding: 0;
+    border: none;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  /* ── Labels (h5) ── */
+  .kp3p-preview h5 {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 12px 0 4px 0;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  /* ── Paragraphs — clean prose, no boxes ── */
+  .kp3p-preview p {
+    margin: 0 0 8px 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    color: #1e293b;
+    font-size: 12px;
+  }
+
+  /* ── Bold ── */
+  .kp3p-preview b, .kp3p-preview strong {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  /* ── Italic ── */
+  .kp3p-preview em, .kp3p-preview i {
+    color: #475569;
+    font-style: italic;
+  }
+
+  /* ── Tables ── */
+  .kp3p-preview table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px 0;
+    font-size: 11.5px;
+    page-break-inside: auto;
+    break-inside: auto;
+    border: 1px solid #cbd5e1;
+  }
+
+  /* Tighten the gap when a table directly follows a heading or label paragraph */
+  .kp3p-preview h2 + table,
+  .kp3p-preview h3 + table,
+  .kp3p-preview h4 + table,
+  .kp3p-preview h5 + table,
+  .kp3p-preview p + table {
+    margin-top: 4px;
+  }
+  .kp3p-preview tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* Header row — either explicit thead OR first row of any table */
+  .kp3p-preview thead tr,
+  .kp3p-preview table > tr:first-child,
+  .kp3p-preview tbody > tr:first-child {
+    background: #1e40af;
+  }
+  .kp3p-preview thead th,
+  .kp3p-preview th,
+  .kp3p-preview thead tr td,
+  .kp3p-preview table > tr:first-child td,
+  .kp3p-preview tbody > tr:first-child td {
+    background: #1e40af;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 9px 12px;
+    border: 1px solid #1e40af;
+    border-right: 1px solid rgba(255,255,255,0.2);
+    text-align: left;
+    vertical-align: middle;
+  }
+  .kp3p-preview thead th:last-child,
+  .kp3p-preview thead tr td:last-child,
+  .kp3p-preview table > tr:first-child td:last-child,
+  .kp3p-preview tbody > tr:first-child td:last-child {
+    border-right: 1px solid #1e40af;
+  }
+
+  /* Body cells */
+  .kp3p-preview td {
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    color: #1e293b;
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  /* Zebra striping on body rows (skip the first row which is header) */
+  .kp3p-preview tbody tr:nth-of-type(even):not(:first-child) { background: #f8fafc; }
+  .kp3p-preview tbody tr:nth-of-type(odd):not(:first-child) { background: #ffffff; }
+
+  /* First column emphasis */
+  .kp3p-preview tbody tr:not(:first-child) td:first-child {
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  /* ── Lists ── */
+  .kp3p-preview ul, .kp3p-preview ol {
+    margin: 6px 0 12px 0;
+    padding-left: 20px;
+  }
+  .kp3p-preview li {
+    margin-bottom: 5px;
+    color: #1e293b;
+    line-height: 1.6;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    font-size: 12px;
+  }
+  .kp3p-preview li::marker { color: #1e40af; font-weight: 700; }
+
+  /* Ordered list (medications, etc) - slightly more spacing */
+  .kp3p-preview ol > li {
+    padding: 3px 0 6px 0;
+    margin-bottom: 8px;
+  }
+
+  /* ── Horizontal rule ── */
+  .kp3p-preview hr {
+    border: none;
+    border-top: 1px solid #cbd5e1;
+    margin: 16px 0;
+  }
+
+  /* ── Links ── */
+  .kp3p-preview a {
+    color: #1e40af;
+    text-decoration: none;
+  }
+
+  /* ── Avoid orphans/widows on key blocks ── */
+  .kp3p-preview h2 + p,
+  .kp3p-preview h3 + p,
+  .kp3p-preview h4 + p { page-break-before: avoid; break-before: avoid; }
 `;
+
 
 function isAbortError(e: unknown): boolean {
   return (
@@ -81,7 +275,6 @@ function findDocumentStart(
   return topLevelBoundary(previewRoot, start);
 }
 
-/** Split KP-3P preview DOM into three documents using DOCUMENT 2 / DOCUMENT 3 headings. */
 function getKp3pDocumentSections(previewRoot: HTMLElement): {
   doc1: HTMLElement[];
   doc2: HTMLElement[];
@@ -103,34 +296,258 @@ function getKp3pDocumentSections(previewRoot: HTMLElement): {
   };
 }
 
+function splitHtmlIntoDocuments(html: string): {
+  doc1: string;
+  doc2: string;
+  doc3: string;
+} | null {
+  const root = document.createElement('div');
+  root.className = 'kp3p-preview';
+  root.innerHTML = html;
+  const sections = getKp3pDocumentSections(root);
+  if (
+    !sections ||
+    sections.doc1.length === 0 ||
+    sections.doc2.length === 0 ||
+    sections.doc3.length === 0
+  ) {
+    return null;
+  }
+  return {
+    doc1: sections.doc1.map((node) => node.outerHTML).join(''),
+    doc2: sections.doc2.map((node) => node.outerHTML).join(''),
+    doc3: sections.doc3.map((node) => node.outerHTML).join(''),
+  };
+}
+
+function buildPdfHost(sectionHtml: string, widthPx: number): HTMLDivElement {
+  const host = document.createElement('div');
+  Object.assign(host.style, {
+    position: 'fixed',
+    left: '-12000px',
+    top: '0',
+    width: `${widthPx}px`,
+    boxSizing: 'border-box',
+    backgroundColor: '#ffffff',
+    padding: '50px 56px',
+    fontFamily: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    color: '#0f172a',
+    lineHeight: '1.62',
+    zIndex: '2147483646',
+    opacity: '1',
+    pointerEvents: 'none',
+    overflow: 'visible',
+    fontSize: '12px',
+  });
+  const styleEl = document.createElement('style');
+  styleEl.textContent = KP3P_PREVIEW_STYLES;
+  host.appendChild(styleEl);
+  const inner = document.createElement('div');
+  inner.className = 'kp3p-preview';
+  inner.innerHTML = sectionHtml;
+  host.appendChild(inner);
+  document.body.appendChild(host);
+  return host;
+}
+
+async function downloadSectionPdf(
+  sectionHtml: string,
+  fileName: string,
+  widthPx: number,
+): Promise<void> {
+  const host = buildPdfHost(sectionHtml, widthPx);
+  try {
+    await htmlHostToPdf(host, fileName);
+  } finally {
+    host.remove();
+  }
+}
+
+/**
+ * Section headings that MUST start on a new page when found in the document.
+ * Matched case-insensitively against trimmed heading text content.
+ * These force a page break BEFORE the heading.
+ */
+const FORCED_BREAK_BEFORE_PATTERNS: RegExp[] = [
+  // Document 1 — Clinician Record section structure
+  /STRIDE.{0,5}II/i,           // "STRIDE-II THERAPEUTIC TARGETS" → page 2
+  /Vaccination\s+Protocol/i,    // "Vaccination Protocol" → page 3
+  /^P3\b/i,                     // "P3 — TREATMENT & MONITORING..." → page 4
+  /Long.?term\s+Surveillance/i, // "Long-term Surveillance" → page 5
+  /Physician\s+Alerts?/i,       // "Physician Alerts" → page 6
+];
+
 async function htmlHostToPdf(host: HTMLElement, fileName: string): Promise<void> {
   const originalHeight = host.style.height;
   const originalOverflow = host.style.overflow;
   host.style.height = 'auto';
   host.style.overflow = 'visible';
+
   try {
-    const canvas = await html2canvas(host, {
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfPageWidth = pdf.internal.pageSize.getWidth();   // 210mm
+    const pdfPageHeight = pdf.internal.pageSize.getHeight(); // 297mm
+
+    // Render the full host at 2x scale
+    const fullCanvas = await html2canvas(host, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
       logging: false,
     });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    let heightLeft = pdfHeight;
-    let position = 0;
+    const canvasWidth = fullCanvas.width;
+    const canvasHeight = fullCanvas.height;
 
-    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-    heightLeft -= pdf.internal.pageSize.getHeight();
+    // px per mm on the canvas (scaled)
+    const pxPerMm = canvasWidth / pdfPageWidth;
 
-    while (heightLeft >= 0) {
-      position = heightLeft - pdfHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-      heightLeft -= pdf.internal.pageSize.getHeight();
+    // A4 page height in canvas pixels
+    const pageHeightPx = pdfPageHeight * pxPerMm;
+
+    const inner = host.querySelector('.kp3p-preview') ?? host;
+    const hostRect = host.getBoundingClientRect();
+
+    // Convert a CSS pixel y to canvas-space y (host-relative, scaled by 2)
+    const toCanvasPx = (cssY: number) => (cssY - hostRect.top) * 2;
+
+    // 1) Collect granular break candidates — bottom edges of small block elements.
+    //    We cut at these positions when we have to break inside a region.
+    const blockEls = inner.querySelectorAll('tr, p, h2, h3, h4, h5, li');
+    const breakCandidates: number[] = [0];
+    blockEls.forEach((el) => {
+      const rect = el.getBoundingClientRect();
+      breakCandidates.push(toCanvasPx(rect.bottom));
+    });
+    breakCandidates.push(canvasHeight);
+
+    // 2) Collect "keep together" ranges — tables and h3-sections.
+    //    If one of these straddles a page boundary AND would fit on a fresh page,
+    //    we push it to the next page instead of slicing it.
+    type Range = { top: number; bottom: number; height: number };
+    const keepTogether: Range[] = [];
+
+    // Tables — keep each whole table on one page if possible
+    inner.querySelectorAll('table').forEach((t) => {
+      const rect = t.getBoundingClientRect();
+      const top = toCanvasPx(rect.top);
+      const bottom = toCanvasPx(rect.bottom);
+      keepTogether.push({ top, bottom, height: bottom - top });
+    });
+
+    // h3 sections — content from each h3 to the next h3 (or end of inner)
+    const h3s = Array.from(inner.querySelectorAll('h3'));
+    const innerBottom = toCanvasPx(inner.getBoundingClientRect().bottom);
+    h3s.forEach((h3, i) => {
+      const rect = h3.getBoundingClientRect();
+      const top = toCanvasPx(rect.top);
+      const bottom =
+        i < h3s.length - 1
+          ? toCanvasPx(h3s[i + 1].getBoundingClientRect().top)
+          : innerBottom;
+      keepTogether.push({ top, bottom, height: bottom - top });
+    });
+
+    // 2b) Collect FORCED page-break positions — headings whose text matches
+    //     FORCED_BREAK_BEFORE_PATTERNS will force a new page to start at them.
+    const forcedBreaks: number[] = [];
+    inner.querySelectorAll('h2, h3, h4, h5').forEach((h) => {
+      const text = (h.textContent ?? '').replace(/\s+/g, ' ').trim();
+      if (FORCED_BREAK_BEFORE_PATTERNS.some((p) => p.test(text))) {
+        const rect = h.getBoundingClientRect();
+        const top = toCanvasPx(rect.top);
+        // Skip if this heading is at the very start of the document — no point
+        // forcing a break before content that hasn't started yet.
+        if (top > 10) forcedBreaks.push(top);
+      }
+    });
+
+    // 3) Slice the canvas into PDF pages
+    let pageStart = 0;
+    let isFirstPage = true;
+
+    while (pageStart < canvasHeight) {
+      const pageEnd = pageStart + pageHeightPx;
+      let safeCut: number;
+
+      if (pageEnd >= canvasHeight) {
+        // Last page — just take the rest
+        safeCut = canvasHeight;
+      } else {
+        // Priority 1: forced page breaks within this page → cut at the EARLIEST one
+        const forcedInPage = forcedBreaks.filter(
+          (f) => f > pageStart && f <= pageEnd,
+        );
+
+        if (forcedInPage.length > 0) {
+          safeCut = Math.min(...forcedInPage);
+        } else {
+          // Priority 2: push keep-together ranges that straddle the boundary
+          //            if they would fit on a fresh page
+          const straddlers = keepTogether.filter(
+            (r) =>
+              r.top > pageStart &&
+              r.top < pageEnd &&
+              r.bottom > pageEnd &&
+              r.height <= pageHeightPx,
+          );
+
+          if (straddlers.length > 0) {
+            const earliestTop = Math.min(...straddlers.map((r) => r.top));
+            const candsBefore = breakCandidates.filter(
+              (c) => c > pageStart && c <= earliestTop,
+            );
+            if (candsBefore.length > 0) {
+              safeCut = Math.max(...candsBefore);
+            } else {
+              const cands = breakCandidates.filter(
+                (c) => c > pageStart && c <= pageEnd,
+              );
+              safeCut = cands.length > 0 ? Math.max(...cands) : pageEnd;
+            }
+          } else {
+            // Priority 3: latest granular cut within the page
+            const cands = breakCandidates.filter(
+              (c) => c > pageStart && c <= pageEnd,
+            );
+            safeCut = cands.length > 0 ? Math.max(...cands) : pageEnd;
+          }
+        }
+
+        // Safety: ensure forward progress
+        if (safeCut <= pageStart) safeCut = pageEnd;
+      }
+
+      const sliceHeight = Math.round(safeCut - pageStart);
+      if (sliceHeight <= 0) break;
+
+      // Slice the canvas for this page
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvasWidth;
+      pageCanvas.height = sliceHeight;
+      const ctx = pageCanvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(
+          fullCanvas,
+          0,
+          pageStart,
+          canvasWidth,
+          sliceHeight,
+          0,
+          0,
+          canvasWidth,
+          sliceHeight,
+        );
+      }
+
+      const imgData = pageCanvas.toDataURL('image/png');
+      const sliceHeightMm = sliceHeight / pxPerMm;
+
+      if (!isFirstPage) pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfPageWidth, sliceHeightMm);
+      isFirstPage = false;
+
+      pageStart = safeCut;
     }
 
     pdf.save(fileName);
@@ -139,6 +556,27 @@ async function htmlHostToPdf(host: HTMLElement, fileName: string): Promise<void>
     host.style.overflow = originalOverflow;
   }
 }
+
+const REVIEW_STEP_META: Record<
+  1 | 2 | 3,
+  { title: string; hint: string; fileSuffix: string }
+> = {
+  1: {
+    title: 'Document 1 — Clinician Record',
+    hint: 'Review and edit Document 1, then approve to continue to Document 2.',
+    fileSuffix: 'DOC1_Clinician_Record',
+  },
+  2: {
+    title: 'Document 2 — Patient Information Sheet',
+    hint: 'Review and edit Document 2, then approve to continue to Document 3.',
+    fileSuffix: 'DOC2_Patient_Information_Sheet',
+  },
+  3: {
+    title: 'Document 3 — Prescription Sheet',
+    hint: 'Review and edit Document 3. Once approved, download all 3 PDFs.',
+    fileSuffix: 'DOC3_Prescription_Sheet',
+  },
+};
 
 export function CaresheetButton({
   patient,
@@ -150,10 +588,22 @@ export function CaresheetButton({
   label?: string;
 }) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'preview'>('idle');
-  /** Which long-running step is active when `status === 'loading'` (for LLM cancel only). */
   const [loadingPhase, setLoadingPhase] = useState<'none' | 'llm' | 'pdf'>('none');
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [htmlContent, setHtmlContent] = useState('');
+  const [docSections, setDocSections] = useState<{
+    doc1: string;
+    doc2: string;
+    doc3: string;
+  } | null>(null);
+  const [reviewStep, setReviewStep] = useState<1 | 2 | 3>(1);
+  // Track which docs have been approved (edited HTML saved)
+  const [approvedDocs, setApprovedDocs] = useState<{
+    doc1: string | null;
+    doc2: string | null;
+    doc3: string | null;
+  }>({ doc1: null, doc2: null, doc3: null });
+
   const previewRef = useRef<HTMLDivElement>(null);
   const llmAbortRef = useRef<AbortController | null>(null);
 
@@ -170,6 +620,9 @@ export function CaresheetButton({
     setStatus('loading');
     setBannerError(null);
     setHtmlContent('');
+    setDocSections(null);
+    setReviewStep(1);
+    setApprovedDocs({ doc1: null, doc2: null, doc3: null });
     try {
       const res = await fetch('/api/generate-caresheet', {
         method: 'POST',
@@ -219,12 +672,22 @@ export function CaresheetButton({
         return;
       }
 
-      setHtmlContent(
-        injectKp3pLocalDetails(html, {
-          patientName: patient.name,
-          patientId: patient.id,
-        }),
-      );
+      const injected = injectKp3pLocalDetails(html, {
+        patientName: patient.name,
+        patientId: patient.id,
+      });
+      const split = splitHtmlIntoDocuments(injected);
+      if (!split) {
+        setBannerError(
+          'Could not split into three documents. Keep the "DOCUMENT 2" and "DOCUMENT 3" headings, then try again.',
+        );
+        setHtmlContent('');
+        setStatus('idle');
+        return;
+      }
+      setHtmlContent(injected);
+      setDocSections(split);
+      setReviewStep(1);
       setStatus('preview');
     } catch (e: unknown) {
       if (isAbortError(e)) {
@@ -240,88 +703,62 @@ export function CaresheetButton({
     }
   };
 
-  const downloadPdf = async () => {
-    if (!previewRef.current) return;
+  const getCurrentDocHtml = (): string => {
+    const editable = previewRef.current?.querySelector<HTMLElement>('.kp3p-preview');
+    return editable?.innerHTML ?? '';
+  };
+
+  // Approve current doc (save edits) and move to next — no download yet
+  const handleApproveAndNext = () => {
+    if (!docSections || reviewStep >= 3) return;
+    const currentHtml = getCurrentDocHtml();
+    setApprovedDocs((prev) => ({
+      ...prev,
+      [`doc${reviewStep}`]: currentHtml,
+    }));
+    setReviewStep((reviewStep + 1) as 2 | 3);
+  };
+
+  // Approve doc 3 and trigger download of all 3 PDFs
+  const handleApproveAndDownloadAll = async () => {
+    if (!docSections) return;
+    const doc3Html = getCurrentDocHtml();
+
+    const finalDocs = {
+      doc1: approvedDocs.doc1 ?? docSections.doc1,
+      doc2: approvedDocs.doc2 ?? docSections.doc2,
+      doc3: doc3Html,
+    };
+
     setLoadingPhase('pdf');
     setStatus('loading');
     setBannerError(null);
 
-    const outer = previewRef.current;
-    const editable = outer.querySelector<HTMLElement>('.kp3p-preview');
-    if (!editable) {
-      setBannerError('PDF download failed. Please try again.');
-      setStatus('preview');
-      setLoadingPhase('none');
-      return;
-    }
-
+    const widthPx = Math.max(previewRef.current?.clientWidth ?? 640, 640);
     const baseName = safeFileSegment(patient.name);
-    const widthPx = Math.max(outer.clientWidth, 640);
-
-    const buildHost = (sectionNodes: HTMLElement[]): HTMLDivElement => {
-      const host = document.createElement('div');
-      // Must stay fully opaque: html2canvas often renders opacity:0 as a blank bitmap.
-      Object.assign(host.style, {
-        position: 'fixed',
-        left: '-12000px',
-        top: '0',
-        width: `${widthPx}px`,
-        boxSizing: 'border-box',
-        backgroundColor: '#fff',
-        padding: '40px',
-        fontFamily: 'Arial, sans-serif',
-        color: '#333',
-        lineHeight: '1.6',
-        zIndex: '2147483646',
-        opacity: '1',
-        pointerEvents: 'none',
-        overflow: 'visible',
-      });
-      const styleEl = document.createElement('style');
-      styleEl.textContent = KP3P_PREVIEW_STYLES;
-      host.appendChild(styleEl);
-      const inner = document.createElement('div');
-      inner.className = 'kp3p-preview';
-      for (const node of sectionNodes) {
-        inner.appendChild(node.cloneNode(true));
-      }
-      host.appendChild(inner);
-      document.body.appendChild(host);
-      return host;
-    };
 
     try {
-      const sections = getKp3pDocumentSections(editable);
-      if (
-        !sections ||
-        sections.doc1.length === 0 ||
-        sections.doc2.length === 0 ||
-        sections.doc3.length === 0
-      ) {
-        setBannerError(
-          'Could not split into three documents. Keep the “DOCUMENT 2” and “DOCUMENT 3” headings, then try again.',
-        );
-        setStatus('preview');
-        return;
-      }
+      await downloadSectionPdf(
+        finalDocs.doc1,
+        `KP3P_${baseName}_DOC1_Clinician_Record.pdf`,
+        widthPx,
+      );
+      await downloadSectionPdf(
+        finalDocs.doc2,
+        `KP3P_${baseName}_DOC2_Patient_Information_Sheet.pdf`,
+        widthPx,
+      );
+      await downloadSectionPdf(
+        finalDocs.doc3,
+        `KP3P_${baseName}_DOC3_Prescription_Sheet.pdf`,
+        widthPx,
+      );
 
-      const host1 = buildHost(sections.doc1);
-      const host2 = buildHost(sections.doc2);
-      const host3 = buildHost(sections.doc3);
-      try {
-        await htmlHostToPdf(
-          host1,
-          `KP3P_${baseName}_DOC1_Clinician_Record.pdf`,
-        );
-        await htmlHostToPdf(host2, `KP3P_${baseName}_DOC2_Patient_Information_Sheet.pdf`);
-        await htmlHostToPdf(host3, `KP3P_${baseName}_DOC3_Prescription_Sheet.pdf`);
-      } finally {
-        host1.remove();
-        host2.remove();
-        host3.remove();
-      }
-
+      // All done — reset
       setStatus('idle');
+      setDocSections(null);
+      setApprovedDocs({ doc1: null, doc2: null, doc3: null });
+      setReviewStep(1);
     } catch {
       setBannerError('PDF download failed. Please try again.');
       setStatus('preview');
@@ -330,13 +767,32 @@ export function CaresheetButton({
     }
   };
 
+  const closePreview = () => {
+    setStatus('idle');
+    setDocSections(null);
+    setReviewStep(1);
+    setApprovedDocs({ doc1: null, doc2: null, doc3: null });
+    dismissBanner();
+  };
+
   const showPreviewModal =
     status === 'preview' ||
     (status === 'loading' && loadingPhase === 'pdf') ||
     (status === 'loading' && loadingPhase === 'llm' && htmlContent.length > 0);
+
   const pdfCaptureBusy = status === 'loading' && loadingPhase === 'pdf';
   const llmStreaming = status === 'loading' && loadingPhase === 'llm';
   const readyForReview = status === 'preview';
+  const stepMeta = REVIEW_STEP_META[reviewStep];
+
+  const previewHtml =
+    readyForReview && docSections
+      ? reviewStep === 1
+        ? docSections.doc1
+        : reviewStep === 2
+          ? docSections.doc2
+          : docSections.doc3
+      : htmlContent;
 
   return (
     <>
@@ -482,9 +938,11 @@ export function CaresheetButton({
                   fontFamily: 'Inter, sans-serif',
                 }}
               >
-                ⏳ Building PDFs…
+                ⏳ Building PDFs… please wait
               </div>
             )}
+
+            {/* Header */}
             <div
               style={{
                 padding: '20px',
@@ -492,18 +950,57 @@ export function CaresheetButton({
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                gap: 16,
               }}
             >
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#0f172a' }}>
-                {llmStreaming ? 'Generating Care Sheet…' : 'Preview Caresheet'}
-              </h2>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#0f172a' }}>
+                  {llmStreaming ? 'Generating Care Sheet…' : stepMeta.title}
+                </h2>
+                {readyForReview && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontSize: 12,
+                      fontFamily: 'Inter, sans-serif',
+                      color: '#64748b',
+                    }}
+                  >
+                    {([1, 2, 3] as const).map((step) => {
+                      const isApproved = step < reviewStep;
+                      const isCurrent = step === reviewStep;
+                      return (
+                        <span
+                          key={step}
+                          style={{
+                            padding: '2px 10px',
+                            borderRadius: 999,
+                            fontWeight: 600,
+                            backgroundColor: isCurrent
+                              ? '#2563eb'
+                              : isApproved
+                                ? '#dcfce7'
+                                : '#f1f5f9',
+                            color: isCurrent ? '#fff' : isApproved ? '#166534' : '#64748b',
+                          }}
+                        >
+                          Doc {step}
+                          {isApproved ? ' ✓' : ''}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 disabled={pdfCaptureBusy || llmStreaming}
                 onClick={() => {
                   if (pdfCaptureBusy || llmStreaming) return;
-                  setStatus('idle');
-                  dismissBanner();
+                  closePreview();
                 }}
                 style={{
                   background: 'none',
@@ -518,6 +1015,7 @@ export function CaresheetButton({
               </button>
             </div>
 
+            {/* Body */}
             <div
               style={{ padding: '30px', overflowY: 'auto', flex: 1, backgroundColor: '#f8fafc' }}
             >
@@ -536,13 +1034,12 @@ export function CaresheetButton({
               >
                 {llmStreaming ? (
                   <>
-                    ⏳ <b>Generating…</b> The care sheet is still being written. Review and download
-                    will be available when generation completes.
+                    ⏳ <b>Generating…</b> The care sheet is still being written. Review and
+                    download will be available when generation completes.
                   </>
                 ) : (
                   <>
-                    ✏️ <b>Edit Mode Active:</b> You can click anywhere in the document below to edit
-                    the text before downloading.
+                    ✏️ <b>Step {reviewStep} of 3:</b> {stepMeta.hint}
                   </>
                 )}
               </div>
@@ -551,24 +1048,27 @@ export function CaresheetButton({
                 ref={previewRef}
                 style={{
                   backgroundColor: '#fff',
-                  padding: '40px',
+                  padding: '50px 56px',
                   borderRadius: '8px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                  fontFamily: 'Arial, sans-serif',
-                  color: '#333',
-                  lineHeight: 1.6,
+                  fontFamily: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+                  color: '#0f172a',
+                  lineHeight: 1.62,
+                  fontSize: '12px',
                 }}
               >
                 <style dangerouslySetInnerHTML={{ __html: KP3P_PREVIEW_STYLES }} />
                 <div
+                  key={readyForReview ? `doc-${reviewStep}` : 'streaming'}
                   className="kp3p-preview"
                   contentEditable={readyForReview && !pdfCaptureBusy}
                   suppressContentEditableWarning={true}
-                  dangerouslySetInnerHTML={{ __html: htmlContent }}
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
                 />
               </div>
             </div>
 
+            {/* Footer */}
             <div
               style={{
                 padding: '20px',
@@ -579,7 +1079,7 @@ export function CaresheetButton({
                 gap: '12px',
               }}
             >
-              {llmStreaming ? (
+              {llmStreaming && (
                 <span
                   style={{
                     marginRight: 'auto',
@@ -590,15 +1090,15 @@ export function CaresheetButton({
                 >
                   ⏳ Streaming response…
                 </span>
-              ) : null}
+              )}
+
               {!llmStreaming && (
                 <button
                   type="button"
                   disabled={pdfCaptureBusy}
                   onClick={() => {
                     if (pdfCaptureBusy) return;
-                    setStatus('idle');
-                    dismissBanner();
+                    closePreview();
                   }}
                   style={{
                     padding: '10px 20px',
@@ -614,23 +1114,49 @@ export function CaresheetButton({
                   Cancel
                 </button>
               )}
-              {readyForReview && (
+
+              {/* Steps 1 & 2: Approve and move to next doc (no download) */}
+              {readyForReview && reviewStep < 3 && (
                 <button
                   type="button"
                   disabled={pdfCaptureBusy}
-                  onClick={downloadPdf}
+                  onClick={handleApproveAndNext}
                   style={{
                     padding: '10px 20px',
                     borderRadius: '6px',
                     border: 'none',
                     background: '#2563eb',
                     color: '#fff',
-                    cursor: pdfCaptureBusy ? 'wait' : 'pointer',
+                    cursor: pdfCaptureBusy ? 'not-allowed' : 'pointer',
                     fontWeight: 600,
                     opacity: pdfCaptureBusy ? 0.6 : 1,
                   }}
                 >
-                  Confirm & Download PDFs
+                  Approve Document {reviewStep} →
+                </button>
+              )}
+
+              {/* Step 3: Approve doc 3 + download all 3 PDFs */}
+              {readyForReview && reviewStep === 3 && (
+                <button
+                  type="button"
+                  disabled={pdfCaptureBusy}
+                  onClick={handleApproveAndDownloadAll}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: '#059669',
+                    color: '#fff',
+                    cursor: pdfCaptureBusy ? 'wait' : 'pointer',
+                    fontWeight: 600,
+                    opacity: pdfCaptureBusy ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  ✅ Approve & Download All 3 PDFs
                 </button>
               )}
             </div>

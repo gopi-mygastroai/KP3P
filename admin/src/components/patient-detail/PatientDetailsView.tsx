@@ -9,7 +9,7 @@ import {
   UpperGiFindingsDisplay,
 } from '@/components/patient-detail/PatientDetailDisplays';
 import type { PatientWithUser } from '@/types/assessment-form';
-import { renderVaccineCard, patientContactEmail, patientDetailsViewStyles } from '@/components/patient-detail/patient-details-view-shared';
+import { renderVaccineCard, patientContactEmail, patientDetailsViewStyles, PatientFieldGrid } from '@/components/patient-detail/patient-details-view-shared';
 
 
 type Props = { patient: PatientWithUser };
@@ -50,11 +50,11 @@ export default function PatientDetailsView({ patient }: Props) {
   return (
     <>
       <style>{patientDetailsViewStyles}</style>
-      {/* ── BODY ── */}
+      <div className="pr-view">
         <div className="pr-body">
 
           {/* LEFT COLUMN */}
-          <div>
+          <div className="pr-main-column">
 
             {/* 01 Patient Characteristics */}
             <div className="pr-card">
@@ -63,31 +63,32 @@ export default function PatientDetailsView({ patient }: Props) {
                 <span className="pr-card-title">Patient Characteristics</span>
                 <span className="pr-card-num">01</span>
               </div>
-              <div className="pr-field-grid">
-                {[
-                  { label: 'Full Name', value: patient.name },
-                  { label: 'Email', value: patientContactEmail(patient) },
-                  { label: 'Medical Record No.', value: patient.mrn },
-                  { label: 'Contact Phone', value: patient.contactPhone },
-                  { label: 'Place of Living', value: patient.placeOfLiving },
-                  { label: 'Referred By', value: patient.referredBy },
-                  { label: 'Date of Birth', value: patient.dateOfBirth },
-                  { label: 'Current Age', value: patient.currentAge ? `${patient.currentAge} yrs` : '' },
-                  { label: 'Sex', value: patient.sex },
-                  { label: 'Preferred Language', value: patient.preferredLanguage },
-                  { label: 'Occupation', value: patient.occupation },
-                  { label: 'Special Considerations', value: patient.specialConsiderations },
+              <PatientFieldGrid
+                fields={[
+                  { label: 'Full Name', value: patient.name, empty: !patient.name },
+                  { label: 'Email', value: patientContactEmail(patient), empty: patientContactEmail(patient) === 'N/A' },
+                  { label: 'Medical Record No.', value: patient.mrn, empty: !patient.mrn },
+                  { label: 'Contact Phone', value: patient.contactPhone, empty: !patient.contactPhone },
+                  { label: 'Place of Living', value: patient.placeOfLiving, empty: !patient.placeOfLiving },
+                  { label: 'Referred By', value: patient.referredBy, empty: !patient.referredBy },
+                  { label: 'Date of Birth', value: patient.dateOfBirth, empty: !patient.dateOfBirth },
+                  {
+                    label: 'Current Age',
+                    value: patient.currentAge ? `${patient.currentAge} yrs` : 'Not provided',
+                    empty: !patient.currentAge,
+                  },
+                  { label: 'Sex', value: patient.sex, empty: !patient.sex },
+                  { label: 'Preferred Language', value: patient.preferredLanguage, empty: !patient.preferredLanguage },
+                  { label: 'Occupation', value: patient.occupation, empty: !patient.occupation },
+                  { label: 'Special Considerations', value: patient.specialConsiderations, empty: !patient.specialConsiderations },
                   {
                     label: 'Smoking',
-                    value: formatSmokingSummary(patient.smokingStatus, patient.smokingDetails),
+                    value: formatSmokingSummary(patient.smokingStatus, patient.smokingDetails) || 'Not provided',
+                    empty: !formatSmokingSummary(patient.smokingStatus, patient.smokingDetails),
+                    fullWidth: true,
                   },
-                ].map((f, i) => (
-                  <div className="pr-field" key={i}>
-                    <div className="pr-field-label">{f.label}</div>
-                    <div className={`pr-field-value${!f.value || f.value === 'N/A' ? ' empty' : ''}`}>{f.value || 'Not provided'}</div>
-                  </div>
-                ))}
-              </div>
+                ]}
+              />
             </div>
 
             {/* 02 Disease Characteristics */}
@@ -97,31 +98,35 @@ export default function PatientDetailsView({ patient }: Props) {
                 <span className="pr-card-title">Disease Characteristics</span>
                 <span className="pr-card-num">02</span>
               </div>
-              <div className="pr-field-grid">
-                                <div className="pr-field">
-                  <div className="pr-field-label">Primary Diagnosis</div>
-                  <div className="pr-field-value" style={{ color: '#7c3aed', fontWeight: 600 }}>{patient.primaryDiagnosis || '—'}</div>
-                </div>
-                <div className="pr-field">
-                  <div className="pr-field-label">Age at Diagnosis</div>
-                  <div className="pr-field-value">
-                    {Number.isFinite(patient.ageAtDiagnosis)
-                      ? `${patient.ageAtDiagnosis} yrs`
-                      : '—'}
-                  </div>
-                </div>
-                <div className="pr-field" style={{ gridColumn: '1 / -1' }}>
-                  <div className="pr-field-label">Disease Duration</div>
-                  <div className="pr-field-value">{patient.diseaseDuration || '—'}</div>
-                </div>
-                {patient.primaryDiagnosis === "Crohn's Disease" && (
-                  <div className="pr-field" style={{ gridColumn: '1 / -1' }}>
-                    <div className="pr-field-label">Perianal Disease Assessment</div>
-                    <div className={`pr-field-value${!patient.perianalDiseaseAssessment?.trim() ? ' empty' : ''}`}>
-                      {patient.perianalDiseaseAssessment?.trim() || 'Not provided'}
-                    </div>
-                  </div>
-                )}
+              <PatientFieldGrid
+                fields={[
+                  {
+                    label: 'Primary Diagnosis',
+                    value: patient.primaryDiagnosis || '—',
+                    empty: !patient.primaryDiagnosis,
+                    valueStyle: { color: '#7c3aed', fontWeight: 600 },
+                  },
+                  {
+                    label: 'Age at Diagnosis',
+                    value: Number.isFinite(patient.ageAtDiagnosis) ? `${patient.ageAtDiagnosis} yrs` : '—',
+                    empty: !Number.isFinite(patient.ageAtDiagnosis),
+                  },
+                  {
+                    label: 'Disease Duration',
+                    value: patient.diseaseDuration || '—',
+                    empty: !patient.diseaseDuration,
+                    fullWidth: true,
+                  },
+                  ...(patient.primaryDiagnosis === "Crohn's Disease"
+                    ? [{
+                        label: 'Perianal Disease Assessment',
+                        value: patient.perianalDiseaseAssessment?.trim() || 'Not provided',
+                        empty: !patient.perianalDiseaseAssessment?.trim(),
+                        fullWidth: true,
+                      }]
+                    : []),
+                ]}
+              />
                 <div className="pr-field-section">
                   <div className="pr-field-section-title" style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                     <span>Montreal Classification</span>
@@ -131,7 +136,7 @@ export default function PatientDetailsView({ patient }: Props) {
                       </span>
                     ) : null}
                   </div>
-                  <div className="pr-field-grid">
+                  <div className="pr-field-grid pr-field-grid--legacy">
                     <div className="pr-field">
                       <div className="pr-field-label">Age at Diagnosis</div>
                       <div className="pr-field-value">{patient.montrealAgeAtDiagnosis || '—'}</div>
@@ -160,7 +165,7 @@ export default function PatientDetailsView({ patient }: Props) {
                     )}
                   </div>
                 </div>
-                <div className="pr-field">
+                <div className="pr-field" style={{ margin: '4px 8px 8px' }}>
                   <div className="pr-field-label">Previous Surgeries</div>
                   <div className="pr-field-value">
                     {parseSurgeries.length > 0
@@ -177,7 +182,6 @@ export default function PatientDetailsView({ patient }: Props) {
                     <UpperGiFindingsDisplay raw={patient.upperGiFindings} clinicalNotes={patient.sesCdClinicalNotes} />
                   </>
                 )}
-              </div>
             </div>
 
             {/* 03 Disease Activity */}
@@ -187,7 +191,7 @@ export default function PatientDetailsView({ patient }: Props) {
                 <span className="pr-card-title">Disease Activity & Symptoms</span>
                 <span className="pr-card-num">03</span>
               </div>
-              <div className="pr-field-grid">
+              <div className="pr-field-grid pr-field-grid--legacy">
                 <div className="pr-field" style={{ gridColumn: '1/-1' }}>
                   <div className="pr-field-label">Current Disease Activity</div>
                   <div className="pr-status-badge" style={{ background: `${actColor}15`, border: `1px solid ${actColor}30`, color: actColor, marginTop: 4 }}>
@@ -223,7 +227,7 @@ export default function PatientDetailsView({ patient }: Props) {
                 <span className="pr-card-title">Laboratory & Investigations</span>
                 <span className="pr-card-num">04</span>
               </div>
-              <div className="pr-field-grid">
+              <div className="pr-field-grid pr-field-grid--legacy">
                 <div className="pr-field">
                   <div className="pr-field-label">Date of Assessment</div>
                   <div className={`pr-field-value${!patient.dateMostRecentLabs ? ' empty' : ''}`}>{patient.dateMostRecentLabs || '—'}</div>
@@ -243,7 +247,7 @@ export default function PatientDetailsView({ patient }: Props) {
                       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#475569', marginBottom: 8 }}>
                         {groupTitle}
                       </div>
-                      <div className="pr-field-grid">
+                      <div className="pr-field-grid pr-field-grid--legacy">
                         {entries.map((entry) => (
                           <div className="pr-field" key={`${groupTitle}-${entry.label}`}>
                             <div className="pr-field-label">{entry.label}</div>
@@ -267,7 +271,7 @@ export default function PatientDetailsView({ patient }: Props) {
                 <span className="pr-card-num">05</span>
               </div>
               <CurrentIbdMedicationsDisplay raw={patient.currentIbdMedicationsRows} />
-              <div className="pr-field-grid" style={{ paddingTop: 4 }}>
+              <div className="pr-field-grid pr-field-grid--legacy" style={{ paddingTop: 4 }}>
                 <div className="pr-field" style={{ gridColumn: '1 / -1' }}>
                   <div className="pr-field-label">Response to Current Treatment</div>
                   <div className="pr-field-value">
@@ -349,7 +353,7 @@ export default function PatientDetailsView({ patient }: Props) {
                 <span className="pr-card-title">Comorbidities & Final Details</span>
                 <span className="pr-card-num">08</span>
               </div>
-              <div className="pr-field-grid">
+              <div className="pr-field-grid pr-field-grid--legacy">
                 <div className="pr-field">
                   <div className="pr-field-label">Comorbidities</div>
                   <div className="pr-field-value">
@@ -373,21 +377,33 @@ export default function PatientDetailsView({ patient }: Props) {
           </div>
 
           {/* RIGHT SIDEBAR */}
-          <div>
+          <div className="pr-sidebar-column">
 
             <div className="pr-sidebar-card">
               <div className="pr-sidebar-head">Disease Activity</div>
-              <div className="pr-sidebar-big">
-                <div className="pr-sidebar-big-val" style={{ color: actColor }}>{patient.currentDiseaseActivity || '—'}</div>
-                <div className="pr-sidebar-big-label">{patient.primaryDiagnosis}</div>
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 5 }}>
-                  Montreal: {montrealClassDisplay || '—'}
+              <div className="pr-sidebar-body">
+                <div className="pr-srow">
+                  <span className="pr-srow-label">Activity</span>
+                  <span className="pr-srow-val" style={{ color: actColor, fontSize: 20, fontWeight: 700 }}>
+                    {patient.currentDiseaseActivity || '—'}
+                  </span>
+                </div>
+                <div className="pr-srow">
+                  <span className="pr-srow-label">Diagnosis</span>
+                  <span className="pr-srow-val" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {patient.primaryDiagnosis || '—'}
+                  </span>
+                </div>
+                <div className="pr-srow">
+                  <span className="pr-srow-label">Montreal</span>
+                  <span className="pr-srow-val">{montrealClassDisplay || '—'}</span>
                 </div>
               </div>
             </div>
 
             <div className="pr-sidebar-card">
               <div className="pr-sidebar-head">Demographics</div>
+              <div className="pr-sidebar-body">
               {[
                 { label: 'Age', value: patient.currentAge ? `${patient.currentAge} years` : '—' },
                 { label: 'Age at Dx', value: patient.ageAtDiagnosis ? `${patient.ageAtDiagnosis} years` : '—' },
@@ -402,10 +418,12 @@ export default function PatientDetailsView({ patient }: Props) {
                   <span className="pr-srow-val">{r.value || '—'}</span>
                 </div>
               ))}
+              </div>
             </div>
 
             <div className="pr-sidebar-card">
               <div className="pr-sidebar-head">Clinical Snapshot</div>
+              <div className="pr-sidebar-body">
               {[
                 { label: 'Activity Score', value: patient.activityScore },
                 { label: 'Stool / day', value: patient.stoolFrequency },
@@ -419,10 +437,12 @@ export default function PatientDetailsView({ patient }: Props) {
                   <span className="pr-srow-val">{r.value || '—'}</span>
                 </div>
               ))}
+              </div>
             </div>
 
             <div className="pr-sidebar-card">
               <div className="pr-sidebar-head">Serology Summary</div>
+              <div className="pr-sidebar-body">
               {[
                 { label: 'TB', value: patient.tbScreening },
                 { label: 'HBsAg', value: patient.hepBSurfaceAg },
@@ -430,14 +450,16 @@ export default function PatientDetailsView({ patient }: Props) {
                 { label: 'Anti-HIV', value: patient.antiHiv },
               ].map((r, i) => (
                 <div key={i} className="pr-infection-row">
-                  <span style={{ fontSize: 11, color: '#64748b' }}>{r.label}</span>
-                  <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: labStatusColor(r.value) }}>{r.value || '—'}</span>
+                  <span className="pr-srow-label">{r.label}</span>
+                  <span className="pr-srow-val" style={{ color: labStatusColor(r.value) }}>{r.value || '—'}</span>
                 </div>
               ))}
+              </div>
             </div>
 
             <div className="pr-sidebar-card">
               <div className="pr-sidebar-head">Record Info</div>
+              <div className="pr-sidebar-body">
               {[
                 { label: 'Patient ID', value: `#${patient.id}` },
                 { label: 'User ID', value: `#${patient.userId}` },
@@ -450,6 +472,7 @@ export default function PatientDetailsView({ patient }: Props) {
                   <span className="pr-srow-val">{r.value || '—'}</span>
                 </div>
               ))}
+              </div>
               <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#94a3b8', padding: '8px 12px', textAlign: 'right' }}>
                 REC-{patient.id}-{patient.mrn}
               </div>
@@ -457,6 +480,7 @@ export default function PatientDetailsView({ patient }: Props) {
 
           </div>
         </div>
+      </div>
     </>
   );
 }

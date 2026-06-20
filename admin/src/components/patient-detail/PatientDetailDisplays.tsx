@@ -32,6 +32,10 @@ import {
 
 const tableWrap: CSSProperties = {
   overflowX: 'auto',
+  maxWidth: '100%',
+  width: '100%',
+  minWidth: 0,
+  WebkitOverflowScrolling: 'touch',
   border: '0.5px solid #e2e8f0',
   borderRadius: 10,
   margin: '8px 12px 12px',
@@ -140,7 +144,7 @@ export function UcEndoscopicScoringDisplay({ raw }: { raw: unknown }) {
   return (
     <div className="pr-field-section" style={{ margin: '4px 8px 12px' }}>
       <div className="pr-field-section-title">UC Endoscopic Scoring</div>
-      <div className="pr-field-grid">
+      <div className="pr-field-grid pr-field-grid--legacy">
         <div className="pr-field">
           <div className="pr-field-label">{MAYO_FIELD_LABEL}</div>
           <div className="pr-field-value">
@@ -189,8 +193,8 @@ export function SesCdScoringDisplay({ raw }: { raw: unknown }) {
           Total: {grandTotal} / 60 — {interpretation.display}
         </span>
       </div>
-      <div style={tableWrap}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+      <div style={tableWrap} className="pr-contained-scroll">
+        <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={thStyle}>Variable</th>
@@ -244,8 +248,8 @@ export function UpperGiFindingsDisplay({
     <div className="pr-field-section" style={{ margin: '4px 8px 12px' }}>
       <div className="pr-field-section-title">Upper GI Findings</div>
       {filledRows.length > 0 ? (
-        <div style={tableWrap}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
+        <div style={tableWrap} className="pr-contained-scroll">
+          <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Segment</th>
@@ -290,7 +294,7 @@ export function CurrentIbdMedicationsDisplay({ raw }: { raw: unknown }) {
   const rowById = Object.fromEntries(data.rows.map((row) => [row.drugId, row]));
 
   return (
-    <div style={{ margin: '8px 12px 12px' }}>
+    <div className="pr-contained-block" style={{ margin: '8px 12px 12px' }}>
       <div
         style={{
           padding: '8px 12px',
@@ -311,15 +315,13 @@ export function CurrentIbdMedicationsDisplay({ raw }: { raw: unknown }) {
           CURRENT IBD MEDICATIONS
         </span>
       </div>
-      <div
-        style={{
-          overflowX: 'auto',
+      <div className="pr-contained-scroll" style={{
           border: `1px solid ${MED_SECTION_HEADER}`,
           borderTop: 'none',
           borderRadius: '0 0 8px 8px',
         }}
       >
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
+        <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={{ ...medHeaderCell, minWidth: 160, textAlign: 'left' }}>DRUG NAME</th>

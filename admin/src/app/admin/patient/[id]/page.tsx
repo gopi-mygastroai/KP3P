@@ -45,16 +45,33 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+        }
         body { background: #f1f5f9; font-family: 'Inter', system-ui, sans-serif; }
 
-        .pr-root { min-height: 100vh; background: #f1f5f9; color: #0f172a; }
+        .pr-root {
+          min-height: 100vh;
+          background: #f1f5f9;
+          color: #0f172a;
+          width: 100%;
+          max-width: 100vw;
+          min-width: 0;
+          overflow-x: hidden;
+        }
 
         .pr-header {
           background: linear-gradient(165deg, #0c1222 0%, #152238 48%, #1a2d4a 100%);
-          padding: 0 28px 0;
+          padding: 0;
           border-bottom: 1px solid rgba(56, 189, 248, 0.22);
           box-shadow: 0 4px 24px rgba(15, 23, 42, 0.35);
           position: relative;
+          width: 100%;
+          max-width: 100vw;
+          min-width: 0;
+          overflow-x: hidden;
         }
         .pr-header::after {
           content: '';
@@ -63,6 +80,16 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
           height: 2px;
           background: linear-gradient(90deg, transparent, #2dd4bf 20%, #38bdf8 50%, #2dd4bf 80%, transparent);
           opacity: 0.55;
+        }
+
+        /* FIXED: removed width: min(1100px, 100%) and margin-inline: auto */
+        .pr-header-inner {
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          min-width: 0;
+          margin-inline: 0;
+          padding-inline: clamp(12px, 2vw, 24px);
         }
 
         .pr-topnav {
@@ -149,7 +176,7 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
         .pr-chip-value { font-size: 13px; font-weight: 700; color: #0f172a; }
 
         @media (max-width: 520px) {
-          .pr-header { padding: 0 16px; }
+          .pr-header-inner { padding-inline: 12px; }
           .pr-topnav { flex-direction: column; align-items: stretch; }
           .pr-back-link { justify-content: center; width: 100%; min-height: 44px; }
         }
@@ -157,53 +184,55 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
 
       <div className="pr-root">
         <div className="pr-header">
-          <div className="pr-topnav">
-            <Link href="/admin" className="pr-back-link">← Back to Dashboard</Link>
-            <PatientActions patient={patient} />
-          </div>
+          <div className="pr-header-inner">
+            <div className="pr-topnav">
+              <Link href="/admin" className="pr-back-link">← Back to Dashboard</Link>
+              <PatientActions patient={patient} />
+            </div>
 
-          <div className="pr-hero">
-            <div className="pr-hero-patient">
-              <div className="pr-avatar">{patient.name?.charAt(0).toUpperCase()}</div>
-              <div>
-                <div className="pr-patient-name">{patient.name}</div>
-                <div className="pr-patient-meta">
-                  <span className="pr-mono-tag">MRN <b>{patient.mrn || '—'}</b></span>
-                  <span className="pr-dot">●</span>
-                  <span className="pr-mono-tag">DOB <b>{patient.dateOfBirth || '—'}</b></span>
-                  <span className="pr-dot">●</span>
-                  <span className="pr-mono-tag"><b>{patient.sex || '—'}</b></span>
-                  <span className="pr-dot">●</span>
-                  <div
-                    className="pr-activity-pill"
-                    style={{
-                      background: `${actColor}20`,
-                      border: `1px solid ${actColor}40`,
-                      color: actColor,
-                    }}
-                  >
-                    <span className="pr-activity-dot" style={{ background: actColor }} />
-                    {patient.currentDiseaseActivity || 'Unknown'}
+            <div className="pr-hero">
+              <div className="pr-hero-patient">
+                <div className="pr-avatar">{patient.name?.charAt(0).toUpperCase()}</div>
+                <div>
+                  <div className="pr-patient-name">{patient.name}</div>
+                  <div className="pr-patient-meta">
+                    <span className="pr-mono-tag">MRN <b>{patient.mrn || '—'}</b></span>
+                    <span className="pr-dot">●</span>
+                    <span className="pr-mono-tag">DOB <b>{patient.dateOfBirth || '—'}</b></span>
+                    <span className="pr-dot">●</span>
+                    <span className="pr-mono-tag"><b>{patient.sex || '—'}</b></span>
+                    <span className="pr-dot">●</span>
+                    <div
+                      className="pr-activity-pill"
+                      style={{
+                        background: `${actColor}20`,
+                        border: `1px solid ${actColor}40`,
+                        color: actColor,
+                      }}
+                    >
+                      <span className="pr-activity-dot" style={{ background: actColor }} />
+                      {patient.currentDiseaseActivity || 'Unknown'}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="pr-chips-row">
-            {[
-              { label: 'Diagnosis', value: patient.primaryDiagnosis || '—' },
-              { label: 'Duration', value: patient.diseaseDuration || '—' },
-              { label: 'Age', value: patient.currentAge ? `${patient.currentAge} yrs` : '—' },
-              { label: 'Age at Dx', value: patient.ageAtDiagnosis ? `${patient.ageAtDiagnosis} yrs` : '—' },
-              { label: 'Smoking', value: formatSmokingSummary(patient.smokingStatus, patient.smokingDetails) || '—' },
-              { label: 'Submitted', value: createdDate },
-            ].map((s, i) => (
-              <div className="pr-chip" key={i}>
-                <span className="pr-chip-label">{s.label}</span>
-                <span className="pr-chip-value">{s.value}</span>
-              </div>
-            ))}
+            <div className="pr-chips-row">
+              {[
+                { label: 'Diagnosis', value: patient.primaryDiagnosis || '—' },
+                { label: 'Duration', value: patient.diseaseDuration || '—' },
+                { label: 'Age', value: patient.currentAge ? `${patient.currentAge} yrs` : '—' },
+                { label: 'Age at Dx', value: patient.ageAtDiagnosis ? `${patient.ageAtDiagnosis} yrs` : '—' },
+                { label: 'Smoking', value: formatSmokingSummary(patient.smokingStatus, patient.smokingDetails) || '—' },
+                { label: 'Submitted', value: createdDate },
+              ].map((s, i) => (
+                <div className="pr-chip" key={i}>
+                  <span className="pr-chip-label">{s.label}</span>
+                  <span className="pr-chip-value">{s.value}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

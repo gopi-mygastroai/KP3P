@@ -120,10 +120,10 @@ export async function POST(req: NextRequest): Promise<Response> {
       if (callErr instanceof LLMConfigurationError) {
         logCaresheetFailure(
           patientIdForLog,
-          'missing_anthropic_api_key',
+          'llm_not_configured',
           callErr,
         );
-        return NextResponse.json({ error: USER_FRIENDLY_502 }, { status: 502 });
+        return NextResponse.json({ error: callErr.message }, { status: 503 });
       }
       if (isLikelyAbortError(callErr)) {
         logCaresheetFailure(patientIdForLog, 'claude_request_aborted', callErr);
