@@ -1,28 +1,34 @@
-import { serializeCurrentIbdMedications, normalizeCurrentIbdMedications } from '../src/lib/current-ibd-medications';
+import {
+  emptyMedicationRow,
+  serializeCurrentIbdMedications,
+  normalizeCurrentIbdMedications,
+} from '../src/lib/current-ibd-medications';
 import type { PatientData } from '../src/lib/kp3p-prompt';
 
 /** Representative patient for prompt export / token sizing. */
 export function sampleKP3PPatient(): PatientData {
-  const medications = normalizeCurrentIbdMedications({ rows: [] });
-  const adalimumab = medications.rows.find((r) => r.drugId === 'adalimumab');
-  if (adalimumab) {
-    adalimumab.currentlyTaking = 'Yes';
-    adalimumab.doseMg = '40';
-    adalimumab.doseUnit = 'mg';
-    adalimumab.frequency = 'Every 2 weeks';
-    adalimumab.route = 'Subcutaneous';
-    adalimumab.duration = '18 months';
-  }
-  const azathioprine = medications.rows.find((r) => r.drugId === 'azathioprine');
-  if (azathioprine) {
-    azathioprine.currentlyTaking = 'Stopped';
-    azathioprine.doseMg = '100';
-    azathioprine.doseUnit = 'mg';
-    azathioprine.frequency = 'Once daily';
-    azathioprine.route = 'Oral';
-    azathioprine.duration = '6 months';
-    azathioprine.reasonForStopping = 'Side effect';
-  }
+  const medications = normalizeCurrentIbdMedications({
+    rows: [
+      {
+        ...emptyMedicationRow(),
+        drugName: 'Adalimumab',
+        dose: '40',
+        doseUnit: 'Milligrams',
+        startDate: '2024-11-01',
+        ongoing: true,
+      },
+      {
+        ...emptyMedicationRow(),
+        drugName: 'Azathioprine',
+        dose: '100',
+        doseUnit: 'Milligrams',
+        startDate: '2023-05-01',
+        endDate: '2023-11-01',
+        ongoing: false,
+        reasonForStopping: 'Intolerence',
+      },
+    ],
+  });
 
   return {
     name: 'Patient ID 42',

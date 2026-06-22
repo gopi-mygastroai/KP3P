@@ -27,6 +27,7 @@ import {
 import IbdInvestigationsForm from './IbdInvestigationsForm';
 import RadiologyInvestigationsForm from './RadiologyInvestigationsForm';
 import CurrentIbdMedicationsTable from './CurrentIbdMedicationsTable';
+import InfectionScreeningForm from './InfectionScreeningForm';
 
 const inter = "'Inter', sans-serif";
 
@@ -260,6 +261,62 @@ const Grid2 = ({ children }: { children: React.ReactNode }) => (
 const ColumnStack = ({ children }: { children: React.ReactNode }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
     {children}
+  </div>
+);
+
+const STEP_SECTION_HEADER = '#0e7490';
+
+const StepFormSection = ({
+  title,
+  headerAside,
+  children,
+}: {
+  title: string;
+  headerAside?: React.ReactNode;
+  children: React.ReactNode;
+}) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <div
+      style={{
+        padding: '8px 12px',
+        background: STEP_SECTION_HEADER,
+        borderRadius: '8px 8px 0 0',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        flexWrap: 'wrap',
+      }}
+    >
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+          color: '#ffffff',
+          fontFamily: inter,
+          lineHeight: 1.25,
+        }}
+      >
+        {title}
+      </span>
+      {headerAside}
+    </div>
+    <div
+      style={{
+        border: `1px solid ${STEP_SECTION_HEADER}`,
+        borderTop: 'none',
+        borderRadius: '0 0 8px 8px',
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 20,
+        background: '#ffffff',
+      }}
+    >
+      {children}
+    </div>
   </div>
 );
 
@@ -918,7 +975,7 @@ export const AdminStep8 = ({ data, updateData }: StepComponentProps) => (
     <CurrentIbdMedicationsTable data={data} updateData={updateData} />
     {radioGroup(
       'responseToTreatment',
-      'Response to Current Treatment',
+      'Response to Current Treatment* (Based on HBI or Partial Mayo scores)',
       [
         'Excellent response (Remission)',
         'Partial response (improved but no remission)',
@@ -928,66 +985,27 @@ export const AdminStep8 = ({ data, updateData }: StepComponentProps) => (
       ],
       data,
       updateData,
-      true,
+      false,
     )}
   </div>
 );
 
 export const AdminStep9 = ({ data, updateData }: StepComponentProps) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-    <ColumnStack>
-      {radioGroup('tbScreening', 'TB Screening Status', [
-        'Not done',
-        'Done - Negative (IGRA or TST)',
-        'Done - Positive, treated',
-        'Done - Positive, not treated',
-        'Unknown',
+    <StepFormSection title="Comorbidities & Clinical Considerations">
+      {checkboxGroup('comorbidities', 'Comorbidities', [
+        'None',
+        'Type 2 Diabetes',
+        'Hypertension',
+        'Heart disease',
+        'CKD',
+        'Liver disease',
+        'Osteoporosis / Osteopenia',
+        'History of cancer (specify type in notes)',
+        'Depression/Anxiety',
+        'Other',
       ], data, updateData, true)}
-      {radioGroup('hepBSurfaceAg', 'Hepatitis B Surface Antigen', [
-        'Not tested',
-        'Negative',
-        'Positive',
-        'Unknown',
-      ], data, updateData, true)}
-      {radioGroup('hepBSurfaceAb', 'Hepatitis B Surface Antibody', [
-        'Not tested',
-        'Positive (Immune)',
-        'Negative (Not immune)',
-        'Unknown',
-      ], data, updateData)}
-      {radioGroup('hepBCoreAb', 'Hepatitis B Core Antibody', [
-        'Not tested',
-        'Negative',
-        'Positive (Past infection)',
-        'Unknown',
-      ], data, updateData)}
-      {radioGroup('antiHcv', 'Anti HCV', [
-        'Not tested',
-        'Negative',
-        'Positive',
-        'Unknown',
-      ], data, updateData)}
-      {radioGroup('antiHiv', 'Anti HIV', [
-        'Not tested',
-        'Negative',
-        'Positive',
-        'Unknown',
-      ], data, updateData)}
-    </ColumnStack>
-    {checkboxGroup('comorbidities', 'Comorbidities', [
-      'None',
-      'Type 2 Diabetes',
-      'Hypertension',
-      'Heart disease',
-      'CKD',
-      'Liver disease',
-      'Osteoporosis / Osteopenia',
-      'History of cancer (specify type in notes)',
-      'Depression/Anxiety',
-      'Other',
-    ], data, updateData, true)}
-    <ColumnStack>
-      {radioGroup('extraintestinalManif', 'Extraintestinal Manifestations', [
+      {checkboxGroup('extraintestinalManif', 'Extraintestinal Manifestations', [
         'None',
         'Uveitis / eye problems',
         'Arthralgia / Arthritis',
@@ -1002,6 +1020,8 @@ export const AdminStep9 = ({ data, updateData }: StepComponentProps) => (
         'Currently pregnant',
         'Currently breast feeding',
       ], data, updateData, true)}
-    </ColumnStack>
+    </StepFormSection>
+
+    <InfectionScreeningForm data={data} updateData={updateData} />
   </div>
 );

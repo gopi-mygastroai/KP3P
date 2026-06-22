@@ -17,6 +17,14 @@ import {
   UcEndoscopicScoringDisplay,
   UpperGiFindingsDisplay,
 } from '@/components/patient-detail/PatientDetailDisplays';
+import {
+  formatTbScreeningSummary,
+  infectionScreeningSetHasData,
+  INFECTION_SCREENING_FIELDS,
+  parseInfectionScreening,
+  primaryInfectionScreeningSet,
+  TB_SCREENING_SUBFIELDS,
+} from '@/lib/infection-screening';
 import type { PatientWithUser } from '@/types/assessment-form';
 import { renderVaccineCard, patientContactEmail, patientDetailsViewStyles } from '@/components/patient-detail/patient-details-view-shared';
 
@@ -30,12 +38,29 @@ export default function PatientDetailsView({ patient }: Props) {
   const parseComorbidities = (() => {
     try { return JSON.parse(patient.comorbidities || '[]'); } catch { return []; }
   })();
+  const parseExtraintestinalManif = (() => {
+    const raw = patient.extraintestinalManif || '';
+    if (!raw.trim()) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return [raw];
+    }
+    return [];
+  })();
   const investigationSets = filledInvestigationSets(
     parseIbdInvestigations(patient.ibdInvestigations, patient.dateMostRecentLabs),
   );
   const radiologySets = filledRadiologySets(
     parseRadiologyInvestigations(patient.radiologyInvestigations),
   );
+  const parsedInfectionScreening = parseInfectionScreening(
+    patient.infectionScreening,
+    patient as Record<string, unknown>,
+  );
+  const infectionScreeningSets = parsedInfectionScreening.sets.filter(infectionScreeningSetHasData);
+  const primaryScreening = primaryInfectionScreeningSet(parsedInfectionScreening);
 
   const montrealClassDisplay = hasMontrealSelections(patient)
     ? composeMontrealClass(montrealFieldsForDiagnosis(patient.primaryDiagnosis, patient))
@@ -384,19 +409,53 @@ export default function PatientDetailsView({ patient }: Props) {
                 <span className="pr-card-num">07</span>
               </div>
               <div className="pr-serology-grid">
-                {[
-                  { label: 'TB Screening Status', value: patient.tbScreening },
-                  { label: 'Hepatitis B Surface Antigen', value: patient.hepBSurfaceAg },
-                  { label: 'Hepatitis B Surface Antibody', value: patient.hepBSurfaceAb },
-                  { label: 'Hepatitis B Core Antibody', value: patient.hepBCoreAb },
-                  { label: 'Anti HCV', value: patient.antiHcv },
-                  { label: 'Anti HIV', value: patient.antiHiv },
-                ].map((s, i) => (
-                  <div className="pr-serology-pill" key={i}>
-                    <div className="pr-serology-label">{s.label}</div>
-                    <div className="pr-serology-value" style={{ color: labStatusColor(s.value) }}>{s.value || '—'}</div>
+                {infectionScreeningSets.length === 0 ? (
+                  <div className="pr-serology-pill" style={{ gridColumn: '1 / -1' }}>
+                    <div className="pr-serology-value empty">No infection screening recorded.</div>
                   </div>
-                ))}
+                ) : (
+                  infectionScreeningSets.map((set, setIndex) => (
+                    <div key={setIndex} style={{ gridColumn: '1 / -1', display: 'contents' }}>
+                      <div className="pr-serology-pill" style={{ gridColumn: '1 / -1' }}>
+                        <div className="pr-serology-label">
+                          Infection Screening{infectionScreeningSets.length > 1 ? ` ${setIndex + 1}` : ''}
+                        </div>
+                        {set.screeningDate?.trim() ? (
+                          <div className="pr-serology-value" style={{ marginTop: 6 }}>
+                            Screening date: {set.screeningDate.trim()}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="pr-serology-pill" style={{ gridColumn: '1 / -1' }}>
+                        <div className="pr-serology-label">TB Screening Status</div>
+                        <div className="pr-field-grid" style={{ paddingTop: 8 }}>
+                          {TB_SCREENING_SUBFIELDS.map((field) => (
+                            <div className="pr-field" key={field.id}>
+                              <div className="pr-field-label">{field.label}</div>
+                              <div
+                                className="pr-field-value"
+                                style={{ color: labStatusColor(String(set[field.id] ?? '')) }}
+                              >
+                                {String(set[field.id] ?? '') || '—'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {INFECTION_SCREENING_FIELDS.map((field) => (
+                        <div className="pr-serology-pill" key={`${setIndex}-${field.id}`}>
+                          <div className="pr-serology-label">{field.label}</div>
+                          <div
+                            className="pr-serology-value"
+                            style={{ color: labStatusColor(String(set[field.id] ?? '')) }}
+                          >
+                            {String(set[field.id] ?? '') || '—'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -437,15 +496,18 @@ export default function PatientDetailsView({ patient }: Props) {
                       : <span className="empty">None</span>}
                   </div>
                 </div>
-                {[
-                  { label: 'Extraintestinal Manifestations', value: patient.extraintestinalManif },
-                  { label: 'Pregnancy / Family Planning Status', value: patient.pregnancyPlanning },
-                ].map((f, i) => (
-                  <div className="pr-field" key={i}>
-                    <div className="pr-field-label">{f.label}</div>
-                    <div className={`pr-field-value${!f.value ? ' empty' : ''}`}>{f.value || '—'}</div>
+                <div className="pr-field">
+                  <div className="pr-field-label">Extraintestinal Manifestations</div>
+                  <div className="pr-field-value">
+                    {parseExtraintestinalManif.length > 0
+                      ? <div className="pr-tag-list">{parseExtraintestinalManif.map((s: string, i: number) => <span key={i} className="pr-tag" style={{ background: 'rgba(99,102,241,0.08)', borderColor: 'rgba(99,102,241,0.2)', color: '#4f46e5' }}>{s}</span>)}</div>
+                      : <span className="empty">None</span>}
                   </div>
-                ))}
+                </div>
+                <div className="pr-field">
+                  <div className="pr-field-label">Pregnancy / Family Planning Status</div>
+                  <div className={`pr-field-value${!patient.pregnancyPlanning ? ' empty' : ''}`}>{patient.pregnancyPlanning || '—'}</div>
+                </div>
               </div>
             </div>
 
@@ -503,10 +565,10 @@ export default function PatientDetailsView({ patient }: Props) {
             <div className="pr-sidebar-card">
               <div className="pr-sidebar-head">Serology Summary</div>
               {[
-                { label: 'TB', value: patient.tbScreening },
-                { label: 'HBsAg', value: patient.hepBSurfaceAg },
-                { label: 'Anti-HCV', value: patient.antiHcv },
-                { label: 'Anti-HIV', value: patient.antiHiv },
+                { label: 'TB', value: formatTbScreeningSummary(primaryScreening) },
+                { label: 'HBsAg', value: primaryScreening.hepBSurfaceAg },
+                { label: 'Anti-HCV', value: primaryScreening.antiHcv },
+                { label: 'Anti-HIV', value: primaryScreening.antiHiv },
               ].map((r, i) => (
                 <div key={i} className="pr-infection-row">
                   <span style={{ fontSize: 11, color: '#64748b' }}>{r.label}</span>

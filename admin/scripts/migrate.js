@@ -77,12 +77,7 @@ async function main() {
           failedTreatments: patient.failedTreatments || '',
           responseToTreatment: patient.responseToTreatment || '',
           
-          tbScreening: patient.tbScreening || '',
-          hepBSurfaceAg: patient.hepBSurfaceAg || '',
-          hepBSurfaceAb: patient.hepBSurfaceAb || '',
-          hepBCoreAb: patient.hepBCoreAb || '',
-          antiHcv: patient.antiHcv || '',
-          antiHiv: patient.antiHiv || '',
+          infectionScreening: patient.infectionScreening || '{"sets":[]}',
           
           influenza: patient.influenza || '',
           covid19: patient.covid19 || '',

@@ -72,12 +72,7 @@ currentIbdMedicationsRows String @default("[]")
 failedTreatments          String
 responseToTreatment     String
 
-tbScreening      String
-hepBSurfaceAg    String
-hepBSurfaceAb    String
-hepBCoreAb       String
-antiHcv          String
-antiHiv          String
+infectionScreening String @default("{\"sets\":[]}")
 
 influenza        String
 covid19          String

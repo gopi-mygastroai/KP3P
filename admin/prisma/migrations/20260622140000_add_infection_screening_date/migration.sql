@@ -1,0 +1,1 @@
+ALTER TABLE "Patient" ADD COLUMN IF NOT EXISTS "infectionScreeningDate" TEXT NOT NULL DEFAULT '';

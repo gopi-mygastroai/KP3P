@@ -3,6 +3,8 @@ import {
   parseIbdInvestigations,
 } from './ibd-investigations';
 import {
+  medicationRowHasData,
+  medicationRowLabel,
   parseCurrentIbdMedications,
   type CurrentIbdMedicationRow,
 } from './current-ibd-medications';
@@ -20,39 +22,31 @@ import {
 import { parseUpperGiFindings, UPPER_GI_SEGMENTS } from './upper-gi-findings';
 import { parseUcEndoscopicScoring, uceisTotal } from './uc-endoscopic-scoring';
 
-function medicationRowLabel(row: CurrentIbdMedicationRow): string {
-  if (row.otherSpecify?.trim()) return `${row.drugName} (${row.otherSpecify.trim()})`;
-  return row.drugName;
-}
-
 function formatMedicationRowDetail(row: CurrentIbdMedicationRow): string {
-  const parts: string[] = [medicationRowLabel(row), `status: ${row.currentlyTaking}`];
-  if (row.drugClass && row.drugClass !== '—') parts.push(`class: ${row.drugClass}`);
-  if (row.doseMg) parts.push(`dose: ${row.doseMg}${row.doseUnit ? ` ${row.doseUnit}` : ''}`);
-  if (row.frequency) parts.push(`freq: ${row.frequency}`);
-  if (row.route) parts.push(`route: ${row.route}`);
-  if (row.duration) parts.push(`duration: ${row.duration}`);
-  if (row.reasonForStopping && row.currentlyTaking === 'Stopped') {
-    parts.push(`reason stopped: ${row.reasonForStopping}`);
+  const parts: string[] = [medicationRowLabel(row)];
+  if (row.dose) parts.push(`dose: ${row.dose}${row.doseUnit ? ` ${row.doseUnit}` : ''}`);
+  if (row.startDate) parts.push(`start: ${row.startDate}`);
+  if (row.ongoing) {
+    parts.push('status: ongoing');
+  } else if (row.endDate) {
+    parts.push(`end: ${row.endDate}`);
   }
+  if (row.reasonForStopping) parts.push(`reason stopped: ${row.reasonForStopping}`);
   return parts.join(' | ');
 }
 
 /** Structured current/prior IBD medication rows for LLM (from assessment table). */
 export function formatMedicationHistoryForPrompt(rowsRaw: unknown): string {
   const data = parseCurrentIbdMedications(rowsRaw);
-  const relevant = data.rows.filter((row) => {
-    const status = row.currentlyTaking.trim();
-    return status && status !== 'Never used';
-  });
+  const relevant = data.rows.filter(medicationRowHasData);
 
   if (relevant.length === 0) {
     return 'None documented';
   }
 
-  const current = relevant.filter((r) => r.currentlyTaking === 'Yes');
-  const stopped = relevant.filter((r) => r.currentlyTaking === 'Stopped');
-  const other = relevant.filter((r) => !['Yes', 'Stopped'].includes(r.currentlyTaking));
+  const current = relevant.filter((row) => row.ongoing);
+  const stopped = relevant.filter((row) => !row.ongoing && (row.endDate || row.reasonForStopping));
+  const other = relevant.filter((row) => !row.ongoing && !row.endDate && !row.reasonForStopping);
 
   const sections: string[] = [];
   if (current.length) {
@@ -62,7 +56,7 @@ export function formatMedicationHistoryForPrompt(rowsRaw: unknown): string {
     sections.push(`Stopped: ${stopped.map(formatMedicationRowDetail).join('; ')}`);
   }
   if (other.length) {
-    sections.push(`Other status: ${other.map(formatMedicationRowDetail).join('; ')}`);
+    sections.push(`Other: ${other.map(formatMedicationRowDetail).join('; ')}`);
   }
   return sections.join(' || ');
 }
@@ -140,7 +134,9 @@ export function formatPartialMayoForPrompt(partialMayoScoringRaw: unknown): stri
 
 export function hasPriorMedicationHistory(rowsRaw: unknown, priorFailed?: string): boolean {
   const data = parseCurrentIbdMedications(rowsRaw);
-  const stopped = data.rows.some((r) => r.currentlyTaking === 'Stopped');
+  const stopped = data.rows.some(
+    (row) => medicationRowHasData(row) && (!row.ongoing && (row.endDate || row.reasonForStopping)),
+  );
   if (stopped) return true;
   if (priorFailed?.trim()) return true;
   return false;

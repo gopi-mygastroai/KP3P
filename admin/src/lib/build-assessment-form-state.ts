@@ -34,10 +34,16 @@ import {
   serializeRadiologyInvestigations,
 } from '@/lib/radiology-investigations';
 import {
-  normalizeCurrentIbdMedications,
-  parseCurrentIbdMedications,
+  parseCurrentIbdMedicationsForForm,
   serializeCurrentIbdMedications,
+  serializeCurrentIbdMedicationsForForm,
 } from '@/lib/current-ibd-medications';
+import {
+  legacyFlatFromPatient,
+  parseInfectionScreening,
+  serializeInfectionScreening,
+  normalizeInfectionScreening,
+} from '@/lib/infection-screening';
 import type { PatientWithUser, AssessmentFormState } from '@/types/assessment-form';
 
 function assessmentField(data: AssessmentFormState, key: string): unknown {
@@ -63,6 +69,23 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
     }
   } catch {
     /* keep string */
+  }
+
+  let extraintestinalManif: string | string[] = patient.extraintestinalManif;
+  try {
+    if (typeof extraintestinalManif === 'string') {
+      const trimmed = extraintestinalManif.trim();
+      if (trimmed.startsWith('[')) {
+        const p = JSON.parse(trimmed) as unknown;
+        extraintestinalManif = Array.isArray(p) ? (p as string[]) : extraintestinalManif;
+      } else if (trimmed) {
+        extraintestinalManif = [trimmed];
+      } else {
+        extraintestinalManif = [];
+      }
+    }
+  } catch {
+    extraintestinalManif = [];
   }
 
   const montrealClass = hasMontrealSelections(patient)
@@ -98,14 +121,22 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
   const parsedRadiology = parseRadiologyInvestigations(patient.radiologyInvestigations);
   const radiologyInvestigations = serializeRadiologyInvestigations(parsedRadiology);
 
-  const currentIbdMedicationsRows = serializeCurrentIbdMedications(
-    normalizeCurrentIbdMedications(parseCurrentIbdMedications(patient.currentIbdMedicationsRows)),
+  const currentIbdMedicationsRows = serializeCurrentIbdMedicationsForForm(
+    parseCurrentIbdMedicationsForForm(patient.currentIbdMedicationsRows),
+  );
+
+  const infectionScreening = serializeInfectionScreening(
+    normalizeInfectionScreening(
+      parseInfectionScreening(patient.infectionScreening, legacyFlatFromPatient(patient as Record<string, unknown>)),
+    ),
   );
 
   return {
     ...patient,
     previousSurgeries,
     comorbidities,
+    extraintestinalManif,
+    infectionScreening,
     montrealClass,
     sesCdScoring,
     hbiScoring,
@@ -171,12 +202,7 @@ const PATIENT_SAVE_FIELD_KEYS = [
   'currentIbdMedicationsRows',
   'failedTreatments',
   'responseToTreatment',
-  'tbScreening',
-  'hepBSurfaceAg',
-  'hepBSurfaceAb',
-  'hepBCoreAb',
-  'antiHcv',
-  'antiHiv',
+  'infectionScreening',
   'influenza',
   'covid19',
   'pneumococcal',
@@ -247,6 +273,18 @@ export function buildAssessmentSavePayload(
   if ('radiologyInvestigations' in payload) {
     payload.radiologyInvestigations = serializeRadiologyInvestigations(
       normalizeRadiologyInvestigations(parseRadiologyInvestigations(payload.radiologyInvestigations)),
+    );
+  }
+
+  if ('currentIbdMedicationsRows' in payload) {
+    payload.currentIbdMedicationsRows = serializeCurrentIbdMedications(
+      parseCurrentIbdMedicationsForForm(payload.currentIbdMedicationsRows),
+    );
+  }
+
+  if ('infectionScreening' in payload) {
+    payload.infectionScreening = serializeInfectionScreening(
+      normalizeInfectionScreening(parseInfectionScreening(payload.infectionScreening)),
     );
   }
 

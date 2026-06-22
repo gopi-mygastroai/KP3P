@@ -34,6 +34,12 @@ import {
   parseCurrentIbdMedications,
   serializeCurrentIbdMedications,
 } from '@/lib/current-ibd-medications';
+import {
+  legacyFlatFromPatient,
+  normalizeInfectionScreening,
+  parseInfectionScreening,
+  serializeInfectionScreening,
+} from '@/lib/infection-screening';
 
 function normalizeJsonArray(val: unknown): string {
   if (Array.isArray(val)) return JSON.stringify(val);
@@ -48,21 +54,21 @@ function normalizeJsonArray(val: unknown): string {
   return JSON.stringify([]);
 }
 
-/** Scalar or checkbox-array → stable string for DB (matches legacy intake + assessment forms). */
+/** Scalar or checkbox-array → JSON array string for DB. */
 function normalizeExtrinsicManifestations(val: unknown): string {
   if (Array.isArray(val)) return JSON.stringify(val);
   if (typeof val === 'string') {
     const t = val.trim();
-    if (!t) return '';
+    if (!t) return JSON.stringify([]);
     try {
       const p = JSON.parse(t);
       if (Array.isArray(p)) return JSON.stringify(p);
     } catch {
-      /* plain label e.g. "Joints" */
+      return JSON.stringify([t]);
     }
-    return val.trim();
+    return JSON.stringify([]);
   }
-  return '';
+  return JSON.stringify([]);
 }
 
 function normalizeJsonObject(val: unknown): string {
@@ -164,12 +170,11 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
     ),
     failedTreatments: typeof b.failedTreatments === 'string' ? b.failedTreatments : '',
     responseToTreatment: typeof b.responseToTreatment === 'string' ? b.responseToTreatment : '',
-    tbScreening: typeof b.tbScreening === 'string' ? b.tbScreening : '',
-    hepBSurfaceAg: typeof b.hepBSurfaceAg === 'string' ? b.hepBSurfaceAg : '',
-    hepBSurfaceAb: typeof b.hepBSurfaceAb === 'string' ? b.hepBSurfaceAb : '',
-    hepBCoreAb: typeof b.hepBCoreAb === 'string' ? b.hepBCoreAb : '',
-    antiHcv: typeof b.antiHcv === 'string' ? b.antiHcv : '',
-    antiHiv: typeof b.antiHiv === 'string' ? b.antiHiv : '',
+    infectionScreening: serializeInfectionScreening(
+      normalizeInfectionScreening(
+        parseInfectionScreening(b.infectionScreening, legacyFlatFromPatient(b)),
+      ),
+    ),
     influenza: normalizeJsonObject(b.influenza),
     covid19: normalizeJsonObject(b.covid19),
     pneumococcal: normalizeJsonObject(b.pneumococcal),

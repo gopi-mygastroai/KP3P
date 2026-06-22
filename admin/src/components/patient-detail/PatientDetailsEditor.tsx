@@ -35,7 +35,7 @@ const STEP_HEADINGS = [
   'Radiology Investigations',
   'Treatment History',
   'Vaccination History',
-  'Infection Screening & Comorbidities',
+  'Comorbidities & Infection Screening',
 ] as const;
 
 const STEP_COMPONENTS = [

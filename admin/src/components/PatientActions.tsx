@@ -11,6 +11,11 @@ import { CaresheetButton } from '@/components/CaresheetButton';
 import type { PatientWithUser } from '@/types/assessment-form';
 import { filledInvestigationSets, parseIbdInvestigations } from '@/lib/ibd-investigations';
 import { formatRadiologyForPrompt } from '@/lib/radiology-investigations';
+import {
+  formatInfectionScreeningForPrompt,
+  parseInfectionScreening,
+  primaryInfectionScreeningSet,
+} from '@/lib/infection-screening';
 import { getErrorMessage } from '@/lib/get-error-message';
 
 /** Full vaccine line(s) for Gemini prompt — includes dose dates when stored as structured JSON. */
@@ -37,11 +42,15 @@ function parseJsonStringArray(raw: unknown): string[] {
 function toKP3PPatient(patient: PatientWithUser): PatientData {
   const labs = { hb: '', tlc: '', platelets: '', crp: '', albumin: '' };
   const comorbidities = parseJsonStringArray(patient.comorbidities);
+  const eim = parseJsonStringArray(patient.extraintestinalManif);
   const specialConsiderationsRaw = patient.specialConsiderations?.trim()
     ? String(patient.specialConsiderations).trim()
     : undefined;
   const specialNotes = specialConsiderationsRaw ? [specialConsiderationsRaw] : undefined;
   const surg = parseJsonStringArray(patient.previousSurgeries);
+  const primaryScreening = primaryInfectionScreeningSet(
+    parseInfectionScreening(patient.infectionScreening, patient as Record<string, unknown>),
+  );
   return {
     name: patient.name || '',
     id: String(patient.id ?? ''),
@@ -86,14 +95,14 @@ function toKP3PPatient(patient: PatientWithUser): PatientData {
     diseaseLocation: patient.diseaseLocation || undefined,
     diseaseBehavior: patient.diseaseBehavior || undefined,
     perianalDisease: patient.perianalDisease || undefined,
-    tbStatus: patient.tbScreening || '',
-    hbsAg: patient.hepBSurfaceAg || '',
-    antiHBs: patient.hepBSurfaceAb || '',
-    antiHBc: patient.hepBCoreAb || '',
-    antiHCV: patient.antiHcv || '',
-    antiHIV: patient.antiHiv || '',
+    tbStatus: formatInfectionScreeningForPrompt(patient.infectionScreening),
+    hbsAg: primaryScreening.hepBSurfaceAg || '',
+    antiHBs: primaryScreening.hepBSurfaceAb || '',
+    antiHBc: primaryScreening.hepBCoreAb || '',
+    antiHCV: primaryScreening.antiHcv || '',
+    antiHIV: primaryScreening.antiHiv || '',
     comorbidities: comorbidities.length ? comorbidities : undefined,
-    eim: patient.extraintestinalManif || undefined,
+    eim: eim.length ? eim.join(', ') : undefined,
     specialNotes,
     specialConsiderations: specialConsiderationsRaw,
     patientLanguage: carePlanPrimaryPatientLanguage(patient.preferredLanguage),
@@ -158,6 +167,10 @@ export default function PatientActions({ patient }: { patient: PatientWithUser }
     }
   };
 
+  const exportScreening = primaryInfectionScreeningSet(
+    parseInfectionScreening(patient.infectionScreening, patient as Record<string, unknown>),
+  );
+
   const docContent = `Generate KP-3P protocol.
 [PATIENT]
 Name:${patient.name||''} ID:${patient.id||''} DOB:${patient.dateOfBirth||''} Age:${patient.currentAge||''}y Sex:${patient.sex||''}
@@ -173,11 +186,11 @@ Radiology:${formatRadiologyForPrompt(patient.radiologyInvestigations)}
 [TREATMENT]
 MedicationRows:${patient.currentIbdMedicationsRows||'[]'} Response:${patient.responseToTreatment||''} FailedTx:${patient.failedTreatments||''}
 [SCREENING]
-TB:${patient.tbScreening||''} HBsAg:${patient.hepBSurfaceAg||''} AntiHBs:${patient.hepBSurfaceAb||''} AntiHBc:${patient.hepBCoreAb||''} AntiHCV:${patient.antiHcv||''} AntiHIV:${patient.antiHiv||''}
+TB:${formatInfectionScreeningForPrompt(patient.infectionScreening)} HBsAg:${exportScreening.hepBSurfaceAg||''} AntiHBs:${exportScreening.hepBSurfaceAb||''} AntiHBc:${exportScreening.hepBCoreAb||''} AntiHCV:${exportScreening.antiHcv||''} AntiHIV:${exportScreening.antiHiv||''}
 [VACCINES]
 Influenza:${formatVaccineForDocExport(patient.influenza)} COVID19:${formatVaccineForDocExport(patient.covid19)} Pneumococcal:${formatVaccineForDocExport(patient.pneumococcal)} HepB:${formatVaccineForDocExport(patient.hepatitisB)} HepA:${formatVaccineForDocExport(patient.hepatitisA)} HepE:${formatVaccineForDocExport(patient.hepatitisE)} Zoster:${formatVaccineForDocExport(patient.zoster)} MMR:${formatVaccineForDocExport(patient.mmr)} Varicella:${formatVaccineForDocExport(patient.varicella)} Tdap:${formatVaccineForDocExport(patient.tetanusTdap)}
 [OTHER]
-Comorbidities:${parseArray(patient.comorbidities)} EIM:${patient.extraintestinalManif||'None'} Pregnancy:${patient.pregnancyPlanning||''} SpecialNotes:${patient.specialConsiderations||''}
+Comorbidities:${parseArray(patient.comorbidities)} EIM:${parseArray(patient.extraintestinalManif)} Pregnancy:${patient.pregnancyPlanning||''} SpecialNotes:${patient.specialConsiderations||''}
 Format: 3-page concise care plan. Part1(Clinical Protocol):English. Part2(Patient Care Plan):${carePlanPrimaryPatientLanguage(patient.preferredLanguage)}`;
 
   const generatePdf = () => {

@@ -16,7 +16,8 @@ import {
 } from '@/lib/partial-mayo-score';
 import type { CSSProperties } from 'react';
 import {
-  CURRENT_IBD_MEDICATION_CATALOG,
+  medicationRowHasData,
+  medicationRowLabel,
   parseCurrentIbdMedications,
 } from '@/lib/current-ibd-medications';
 import {
@@ -415,7 +416,7 @@ export function UpperGiFindingsDisplay({
 
 export function CurrentIbdMedicationsDisplay({ raw }: { raw: unknown }) {
   const data = parseCurrentIbdMedications(raw);
-  const rowById = Object.fromEntries(data.rows.map((row) => [row.drugId, row]));
+  const rows = data.rows.filter(medicationRowHasData);
 
   return (
     <div style={{ margin: '8px 12px 12px' }}>
@@ -447,57 +448,39 @@ export function CurrentIbdMedicationsDisplay({ raw }: { raw: unknown }) {
           borderRadius: '0 0 8px 8px',
         }}
       >
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
-          <thead>
-            <tr>
-              <th style={{ ...medHeaderCell, minWidth: 160, textAlign: 'left' }}>DRUG NAME</th>
-              <th style={{ ...medHeaderCell, minWidth: 120, textAlign: 'left' }}>CLASS</th>
-              <th style={{ ...medHeaderCell, minWidth: 130 }}>CURRENTLY TAKING?</th>
-              <th style={{ ...medHeaderCell, minWidth: 88 }}>DOSE (mg)</th>
-              <th style={{ ...medHeaderCell, minWidth: 88 }}>DOSE UNIT</th>
-              <th style={{ ...medHeaderCell, minWidth: 140 }}>FREQUENCY</th>
-              <th style={{ ...medHeaderCell, minWidth: 120 }}>ROUTE</th>
-              <th style={{ ...medHeaderCell, minWidth: 120 }}>DURATION (free text)</th>
-              <th style={{ ...medHeaderCell, minWidth: 160 }}>REASON FOR STOPPING (if stopped)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {CURRENT_IBD_MEDICATION_CATALOG.map((entry, index) => {
-              const row = rowById[entry.id];
-              if (!row) return null;
-              const alt = index % 2 === 1;
-
-              return (
-                <tr key={entry.id}>
-                  <td style={medLabelCell(alt)}>
-                    {entry.allowSpecify ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <span>{entry.drugName}</span>
-                        {row.otherSpecify?.trim() ? (
-                          <span style={{ fontSize: 11, color: '#475569', fontWeight: 500 }}>
-                            {row.otherSpecify.trim()}
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: 11, color: '#cbd5e1', fontStyle: 'italic' }}>—</span>
-                        )}
-                      </div>
-                    ) : (
-                      entry.drugName
-                    )}
-                  </td>
-                  <td style={medClassCell(alt)}>{entry.drugClass}</td>
-                  <td style={medValueCell}>{displayCell(row.currentlyTaking)}</td>
-                  <td style={medValueCell}>{displayCell(row.doseMg)}</td>
-                  <td style={medValueCell}>{displayCell(row.doseUnit)}</td>
-                  <td style={medValueCell}>{displayCell(row.frequency)}</td>
-                  <td style={medValueCell}>{displayCell(row.route)}</td>
-                  <td style={medValueCell}>{displayCell(row.duration)}</td>
-                  <td style={medValueCell}>{displayCell(row.reasonForStopping)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        {rows.length === 0 ? (
+          <p style={{ margin: 0, padding: '12px 14px', color: '#94a3b8', fontSize: 13 }}>No medications recorded.</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 980 }}>
+            <thead>
+              <tr>
+                <th style={{ ...medHeaderCell, minWidth: 180, textAlign: 'left' }}>DRUG NAME</th>
+                <th style={{ ...medHeaderCell, minWidth: 90 }}>DOSE</th>
+                <th style={{ ...medHeaderCell, minWidth: 110 }}>DOSE UNIT</th>
+                <th style={{ ...medHeaderCell, minWidth: 120 }}>START DATE</th>
+                <th style={{ ...medHeaderCell, minWidth: 120 }}>END DATE</th>
+                <th style={{ ...medHeaderCell, minWidth: 72 }}>ONGOING</th>
+                <th style={{ ...medHeaderCell, minWidth: 180, textAlign: 'left' }}>REASON FOR STOPPING IF ANY</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => {
+                const alt = index % 2 === 1;
+                return (
+                  <tr key={index}>
+                    <td style={medLabelCell(alt)}>{medicationRowLabel(row)}</td>
+                    <td style={medValueCell}>{displayCell(row.dose)}</td>
+                    <td style={medValueCell}>{displayCell(row.doseUnit)}</td>
+                    <td style={medValueCell}>{displayCell(row.startDate)}</td>
+                    <td style={medValueCell}>{row.ongoing ? '—' : displayCell(row.endDate)}</td>
+                    <td style={medValueCell}>{row.ongoing ? 'Yes' : 'No'}</td>
+                    <td style={medValueCell}>{displayCell(row.reasonForStopping)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

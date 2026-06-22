@@ -36,6 +36,10 @@ import {
   buildAssessmentFormState,
   buildAssessmentSavePayload,
 } from '@/lib/build-assessment-form-state';
+import {
+  parseInfectionScreening,
+  validateInfectionScreeningSets,
+} from '@/lib/infection-screening';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -60,7 +64,7 @@ const stepHeadings = [
   "Radiology Investigations",
   "Treatment History",
   "Vaccination History",
-  "Infection Screening & Comorbidities",
+  "Comorbidities & Infection Screening",
 ];
 
 const ASSESSMENT_TOTAL_STEPS = 8;
@@ -289,14 +293,23 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
 
     if (stepNum === 6) {
       if (!String(assessmentField(data, 'responseToTreatment') ?? '').trim()) {
-        return 'Response to Current Treatment';
+        return 'Response to Current Treatment* (Based on HBI or Partial Mayo scores)';
       }
     }
 
     if (stepNum === 8) {
       const missing: string[] = [];
-      if (!isNonEmpty(data?.tbScreening)) missing.push('TB Screening Status');
-      if (!isNonEmpty(data?.hepBSurfaceAg)) missing.push('Hepatitis B Surface Antigen');
+      const screening = parseInfectionScreening(
+        (data as Record<string, unknown>).infectionScreening,
+      );
+
+      for (const set of screening.sets) {
+        if (set.screeningDate.trim() && isFutureIsoDate(set.screeningDate)) {
+          return 'Screening date cannot be in the future';
+        }
+      }
+
+      missing.push(...validateInfectionScreeningSets(screening));
 
       let comorb: unknown[] = [];
       const comorbRaw = data?.comorbidities;
@@ -311,7 +324,23 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
       }
       if (comorb.length === 0) missing.push('Comorbidities');
 
-      if (!isNonEmpty(data?.extraintestinalManif)) missing.push('Extraintestinal Manifestations');
+      let eim: unknown[] = [];
+      const eimRaw = data?.extraintestinalManif;
+      if (Array.isArray(eimRaw)) eim = eimRaw;
+      else if (typeof eimRaw === 'string') {
+        const trimmed = eimRaw.trim();
+        if (trimmed.startsWith('[')) {
+          try {
+            const p = JSON.parse(trimmed);
+            if (Array.isArray(p)) eim = p;
+          } catch {
+            /* ignore */
+          }
+        } else if (trimmed) {
+          eim = [trimmed];
+        }
+      }
+      if (eim.length === 0) missing.push('Extraintestinal Manifestations');
       if (!isNonEmpty(data?.pregnancyPlanning)) missing.push('Pregnancy / Family Planning Status');
 
       if (missing.length > 0) {
