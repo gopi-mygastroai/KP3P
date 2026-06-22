@@ -1,3 +1,7 @@
+import { todayIsoDate } from './iso-date';
+
+export { todayIsoDate, isFutureIsoDate } from './iso-date';
+
 export const MAYO_ENDOSCOPIC_SCORE_OPTIONS = [
   {
     score: 0,
@@ -90,6 +94,8 @@ export type UceisScores = {
 export type UcEndoscopicScoringData = {
   mayoEndoscopicScore: MayoEndoscopicScore;
   uceis: UceisScores;
+  /** ISO date (YYYY-MM-DD) when UC endoscopic scores were captured or observed. */
+  scoringDate?: string;
 };
 
 export function emptyUceisScores(): UceisScores {
@@ -97,7 +103,7 @@ export function emptyUceisScores(): UceisScores {
 }
 
 export function emptyUcEndoscopicScoring(): UcEndoscopicScoringData {
-  return { mayoEndoscopicScore: 0, uceis: emptyUceisScores() };
+  return { mayoEndoscopicScore: 0, uceis: emptyUceisScores(), scoringDate: todayIsoDate() };
 }
 
 function isMayoScore(n: number): n is MayoEndoscopicScore {
@@ -150,19 +156,24 @@ export function parseUcEndoscopicScoring(val: unknown): UcEndoscopicScoringData 
     }
   }
   if (typeof parsed !== 'object' || parsed === null) return emptyUcEndoscopicScoring();
-  const obj = parsed as { mayoEndoscopicScore?: unknown; uceis?: unknown };
+  const obj = parsed as { mayoEndoscopicScore?: unknown; uceis?: unknown; scoringDate?: unknown };
+  const scoringDate = typeof obj.scoringDate === 'string' ? obj.scoringDate : '';
   return {
     mayoEndoscopicScore: parseMayoScore(obj.mayoEndoscopicScore),
     uceis: parseUceisScores(obj.uceis),
+    scoringDate,
   };
 }
 
 export function normalizeUcEndoscopicScoring(data: UcEndoscopicScoringData): UcEndoscopicScoringData {
   const mayo = data.mayoEndoscopicScore;
   const uceis = parseUceisScores(data.uceis);
+  const rawDate = typeof data.scoringDate === 'string' ? data.scoringDate.trim().substring(0, 10) : '';
+  const scoringDate = rawDate || todayIsoDate();
   return {
     mayoEndoscopicScore: isMayoScore(mayo) ? mayo : 0,
     uceis,
+    scoringDate,
   };
 }
 

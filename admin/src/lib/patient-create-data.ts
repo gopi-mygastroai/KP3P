@@ -4,6 +4,16 @@ import type { Prisma } from '@prisma/client';
 import { composeMontrealClass, hasMontrealSelections, montrealFieldsForDiagnosis } from '@/lib/montreal-classification';
 import { normalizeSesCdScoring, parseSesCdScoring, serializeSesCdScoring } from '@/lib/ses-cd-scoring';
 import {
+  normalizeHarveyBradshawIndex,
+  parseHarveyBradshawIndex,
+  serializeHarveyBradshawIndex,
+} from '@/lib/harvey-bradshaw-index';
+import {
+  normalizePartialMayoScore,
+  parsePartialMayoScore,
+  serializePartialMayoScore,
+} from '@/lib/partial-mayo-score';
+import {
   normalizeUcEndoscopicScoring,
   parseUcEndoscopicScoring,
   serializeUcEndoscopicScoring,
@@ -14,6 +24,11 @@ import {
   serializeUpperGiFindings,
 } from '@/lib/upper-gi-findings';
 import { normalizeIbdInvestigations, parseIbdInvestigations, serializeIbdInvestigations } from '@/lib/ibd-investigations';
+import {
+  normalizeRadiologyInvestigations,
+  parseRadiologyInvestigations,
+  serializeRadiologyInvestigations,
+} from '@/lib/radiology-investigations';
 import {
   normalizeCurrentIbdMedications,
   parseCurrentIbdMedications,
@@ -113,6 +128,12 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
       ? composeMontrealClass(montrealFieldsForDiagnosis(b.primaryDiagnosis, b))
       : '',
     sesCdScoring: serializeSesCdScoring(normalizeSesCdScoring(parseSesCdScoring(b.sesCdScoring))),
+    hbiScoring: serializeHarveyBradshawIndex(
+      normalizeHarveyBradshawIndex(parseHarveyBradshawIndex(b.hbiScoring)),
+    ),
+    partialMayoScoring: serializePartialMayoScore(
+      normalizePartialMayoScore(parsePartialMayoScore(b.partialMayoScoring)),
+    ),
     sesCdClinicalNotes:
       typeof b.sesCdClinicalNotes === 'string' ? b.sesCdClinicalNotes.trim() : '',
     upperGiFindings: serializeUpperGiFindings(
@@ -130,7 +151,14 @@ export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma
     weightLoss: typeof b.weightLoss === 'string' ? b.weightLoss : '',
     activityScore: typeof b.activityScore === 'string' ? b.activityScore : '',
     dateMostRecentLabs,
-    ibdInvestigations: serializeIbdInvestigations(normalizeIbdInvestigations(parseIbdInvestigations(b.ibdInvestigations))),
+    ibdInvestigations: serializeIbdInvestigations(
+      normalizeIbdInvestigations(
+        parseIbdInvestigations(b.ibdInvestigations, dateMostRecentLabs),
+      ),
+    ),
+    radiologyInvestigations: serializeRadiologyInvestigations(
+      normalizeRadiologyInvestigations(parseRadiologyInvestigations(b.radiologyInvestigations)),
+    ),
     currentIbdMedicationsRows: serializeCurrentIbdMedications(
       normalizeCurrentIbdMedications(parseCurrentIbdMedications(b.currentIbdMedicationsRows)),
     ),

@@ -7,10 +7,25 @@ import {
   isMontrealFieldVisible,
   montrealFieldsForDiagnosis,
 } from '@/lib/montreal-classification';
+import {
+  normalizeSesCdScoring,
+  parseSesCdScoring,
+  serializeSesCdScoring,
+} from '@/lib/ses-cd-scoring';
+import HarveyBradshawIndexForm from './HarveyBradshawIndexForm';
+import PartialMayoScoreForm from './PartialMayoScoreForm';
 import SesCdScoringTable from './SesCdScoringTable';
 import UpperGiFindingsTable from './UpperGiFindingsTable';
 import UcEndoscopicScoringTool from './UcEndoscopicScoringTool';
+import {
+  normalizeUcEndoscopicScoring,
+  parseUcEndoscopicScoring,
+  serializeUcEndoscopicScoring,
+  todayIsoDate,
+  isFutureIsoDate,
+} from '@/lib/uc-endoscopic-scoring';
 import IbdInvestigationsForm from './IbdInvestigationsForm';
+import RadiologyInvestigationsForm from './RadiologyInvestigationsForm';
 import CurrentIbdMedicationsTable from './CurrentIbdMedicationsTable';
 
 const inter = "'Inter', sans-serif";
@@ -275,10 +290,12 @@ const Divider = ({ label }: { label: string }) => (
 const FieldSection = ({
   label,
   description,
+  headerAside,
   children,
 }: {
   label: string;
   description?: string;
+  headerAside?: React.ReactNode;
   children: React.ReactNode;
 }) => (
   <div style={{
@@ -290,29 +307,38 @@ const FieldSection = ({
     flexDirection: 'column',
     gap: 16,
   }}>
-    <div>
-      <h4 style={{
-        fontSize: 12,
-        fontWeight: 700,
-        letterSpacing: '0.07em',
-        textTransform: 'uppercase',
-        color: '#475569',
-        fontFamily: inter,
-        margin: 0,
-      }}>
-        {label}
-      </h4>
-      {description ? (
-        <p style={{
+    <div style={{
+      display: 'flex',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 16,
+      flexWrap: 'wrap',
+    }}>
+      <div>
+        <h4 style={{
           fontSize: 12,
-          color: '#64748b',
+          fontWeight: 700,
+          letterSpacing: '0.07em',
+          textTransform: 'uppercase',
+          color: '#475569',
           fontFamily: inter,
-          lineHeight: 1.5,
-          margin: '6px 0 0',
+          margin: 0,
         }}>
-          {description}
-        </p>
-      ) : null}
+          {label}
+        </h4>
+        {description ? (
+          <p style={{
+            fontSize: 12,
+            color: '#64748b',
+            fontFamily: inter,
+            lineHeight: 1.5,
+            margin: '6px 0 0',
+          }}>
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {headerAside}
     </div>
     {children}
   </div>
@@ -644,6 +670,24 @@ export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
   const montrealClassSummary = composeMontrealClass(
     montrealFieldsForDiagnosis(diagnosis, montrealFields),
   );
+  const sesCdScoring = normalizeSesCdScoring(parseSesCdScoring(data.sesCdScoring));
+  const ucEndoscopicScoring = normalizeUcEndoscopicScoring(
+    parseUcEndoscopicScoring(data.ucEndoscopicScoring),
+  );
+
+  const updateSesCdScoringDate = (date: string) => {
+    if (date && isFutureIsoDate(date)) return;
+    updateData({
+      sesCdScoring: serializeSesCdScoring({ ...sesCdScoring, scoringDate: date }),
+    });
+  };
+
+  const updateUcScoringDate = (date: string) => {
+    if (date && isFutureIsoDate(date)) return;
+    updateData({
+      ucEndoscopicScoring: serializeUcEndoscopicScoring({ ...ucEndoscopicScoring, scoringDate: date }),
+    });
+  };
 
   return (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -654,10 +698,48 @@ export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
     <div>
       {radioGroup('diseaseDuration', 'Disease Duration', [...PATIENT_DISEASE_DURATIONS], data, updateData, true)}
     </div>
+    {data.primaryDiagnosis === "Crohn's Disease" && (
+      <FieldSection
+        label="Harvey-Bradshaw Index (HBI)  —  Crohn's Disease Activity Score"
+        description="Enter patient details and today's symptoms. Score calculates automatically."
+      >
+        <HarveyBradshawIndexForm data={data} updateData={updateData} />
+      </FieldSection>
+    )}
+    {data.primaryDiagnosis === 'Ulcerative Colitis' && (
+      <FieldSection
+        label="Partial Mayo Score (pMayo)  —  Ulcerative Colitis Activity Index"
+      >
+        <PartialMayoScoreForm data={data} updateData={updateData} />
+      </FieldSection>
+    )}
     {data.primaryDiagnosis === 'Ulcerative Colitis' && (
       <FieldSection
         label="UC Endoscopic Scoring Tool"
         description="Ulcerative Colitis  ·  Mayo Endoscopic Score  +  UCEIS  ·  Auto-calculated"
+        headerAside={(
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180 }}>
+            <label style={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: '#475569',
+              fontFamily: inter,
+            }}>
+              Scoring Date
+            </label>
+            <input
+              type="date"
+              style={{ ...inputStyle, width: 180, padding: '8px 12px', fontSize: 13 }}
+              value={ucEndoscopicScoring.scoringDate ? String(ucEndoscopicScoring.scoringDate).substring(0, 10) : todayIsoDate()}
+              max={todayIsoDate()}
+              onChange={(e) => updateUcScoringDate(e.target.value)}
+              onFocus={(e) => { e.target.style.borderColor = '#0891b2'; }}
+              onBlur={(e) => { e.target.style.borderColor = '#cbd5e1'; }}
+            />
+          </div>
+        )}
       >
         <UcEndoscopicScoringTool data={data} updateData={updateData} />
       </FieldSection>
@@ -666,6 +748,29 @@ export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
       <FieldSection
         label="SES-CD Scoring"
         description="Score each variable for each segment using the dropdown"
+        headerAside={(
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180 }}>
+            <label style={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: '#475569',
+              fontFamily: inter,
+            }}>
+              Scoring Date
+            </label>
+            <input
+              type="date"
+              style={{ ...inputStyle, width: 180, padding: '8px 12px', fontSize: 13 }}
+              value={sesCdScoring.scoringDate ? String(sesCdScoring.scoringDate).substring(0, 10) : todayIsoDate()}
+              max={todayIsoDate()}
+              onChange={(e) => updateSesCdScoringDate(e.target.value)}
+              onFocus={(e) => { e.target.style.borderColor = '#0891b2'; }}
+              onBlur={(e) => { e.target.style.borderColor = '#cbd5e1'; }}
+            />
+          </div>
+        )}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SesCdScoringTable data={data} updateData={updateData} />
@@ -804,6 +909,10 @@ export const AdminStep6 = ({ data, updateData }: StepComponentProps) => (
   <IbdInvestigationsForm data={data} updateData={updateData} />
 );
 
+export const AdminStep7 = ({ data, updateData }: StepComponentProps) => (
+  <RadiologyInvestigationsForm data={data} updateData={updateData} />
+);
+
 export const AdminStep8 = ({ data, updateData }: StepComponentProps) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
     <CurrentIbdMedicationsTable data={data} updateData={updateData} />
@@ -820,15 +929,6 @@ export const AdminStep8 = ({ data, updateData }: StepComponentProps) => (
       data,
       updateData,
       true,
-    )}
-    {textArea(
-      'failedTreatments',
-      'Details of Failed Treatments',
-      data,
-      updateData,
-      false,
-      'For each failed medication - drug name, duration tried, reason for failure',
-      'Placeholder: Example - Infliximab 18 months, secondary loss of response. Adalimumab 3 months, injection site reactions',
     )}
   </div>
 );
@@ -896,7 +996,7 @@ export const AdminStep9 = ({ data, updateData }: StepComponentProps) => (
         'Primary Sclerosing cholangitis',
       ], data, updateData, true)}
       {radioGroup('pregnancyPlanning', 'Pregnancy / Family Planning Status', [
-        'Not applicable (male/post-menopausal)',
+        'Not applicable',
         'Not planning for pregnancy',
         'Planning pregnancy within next year',
         'Currently pregnant',

@@ -115,9 +115,16 @@ export const IBD_INVESTIGATION_GROUPS = [
 export type IbdInvestigationFieldId =
   (typeof IBD_INVESTIGATION_GROUPS)[number]['fields'][number]['id'];
 
-export type IbdInvestigationsData = {
+/** One dated set of lab & investigation values. */
+export type IbdInvestigationSet = {
+  assessmentDate: string;
   investigationDiagnosis: string;
   values: Record<IbdInvestigationFieldId, string>;
+};
+
+/** Multiple lab & investigation sets stored in `Patient.ibdInvestigations`. */
+export type IbdInvestigationsData = {
+  sets: IbdInvestigationSet[];
 };
 
 const FIELD_IDS = IBD_INVESTIGATION_GROUPS.flatMap((group) =>
@@ -130,17 +137,26 @@ function emptyValues(): Record<IbdInvestigationFieldId, string> {
   return values;
 }
 
-export function emptyIbdInvestigations(): IbdInvestigationsData {
+export function emptyIbdInvestigationSet(assessmentDate = ''): IbdInvestigationSet {
   return {
+    assessmentDate,
     investigationDiagnosis: '',
     values: emptyValues(),
   };
 }
 
-export function normalizeIbdInvestigations(
-  input: Partial<IbdInvestigationsData> | null | undefined,
-): IbdInvestigationsData {
-  const base = emptyIbdInvestigations();
+export function emptyIbdInvestigations(): IbdInvestigationsData {
+  return { sets: [emptyIbdInvestigationSet()] };
+}
+
+function isLegacySingleSet(raw: Record<string, unknown>): boolean {
+  return 'values' in raw && !Array.isArray(raw.sets);
+}
+
+export function normalizeIbdInvestigationSet(
+  input: Partial<IbdInvestigationSet> | null | undefined,
+): IbdInvestigationSet {
+  const base = emptyIbdInvestigationSet();
   if (!input) return base;
 
   const values = { ...base.values };
@@ -152,33 +168,94 @@ export function normalizeIbdInvestigations(
   }
 
   return {
+    assessmentDate: typeof input.assessmentDate === 'string' ? input.assessmentDate : '',
     investigationDiagnosis:
       typeof input.investigationDiagnosis === 'string' ? input.investigationDiagnosis : '',
     values,
   };
 }
 
-export function parseIbdInvestigations(raw: unknown): IbdInvestigationsData {
+export function normalizeIbdInvestigations(
+  input: Partial<IbdInvestigationsData> | null | undefined,
+  legacyAssessmentDate = '',
+): IbdInvestigationsData {
+  if (!input) {
+    const initial = emptyIbdInvestigations();
+    if (legacyAssessmentDate.trim()) {
+      initial.sets[0] = { ...initial.sets[0], assessmentDate: legacyAssessmentDate.trim() };
+    }
+    return initial;
+  }
+
+  if (Array.isArray(input.sets) && input.sets.length > 0) {
+    const sets = input.sets.map((set) => normalizeIbdInvestigationSet(set));
+    if (!sets[0].assessmentDate.trim() && legacyAssessmentDate.trim()) {
+      sets[0] = { ...sets[0], assessmentDate: legacyAssessmentDate.trim() };
+    }
+    return { sets };
+  }
+
+  return normalizeIbdInvestigations(null, legacyAssessmentDate);
+}
+
+function parseRawInvestigations(raw: unknown): unknown {
   if (typeof raw === 'string') {
     const trimmed = raw.trim();
-    if (!trimmed) return emptyIbdInvestigations();
+    if (!trimmed) return null;
     try {
-      return normalizeIbdInvestigations(JSON.parse(trimmed) as Partial<IbdInvestigationsData>);
+      return JSON.parse(trimmed) as unknown;
     } catch {
-      return emptyIbdInvestigations();
+      return null;
     }
   }
-  if (raw && typeof raw === 'object') {
-    return normalizeIbdInvestigations(raw as Partial<IbdInvestigationsData>);
+  return raw;
+}
+
+export function parseIbdInvestigations(
+  raw: unknown,
+  legacyAssessmentDate = '',
+): IbdInvestigationsData {
+  const parsed = parseRawInvestigations(raw);
+  if (parsed == null) {
+    return normalizeIbdInvestigations(null, legacyAssessmentDate);
   }
-  return emptyIbdInvestigations();
+
+  if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const obj = parsed as Record<string, unknown>;
+    if (isLegacySingleSet(obj)) {
+      const set = normalizeIbdInvestigationSet({
+        values: obj.values as IbdInvestigationSet['values'],
+        investigationDiagnosis:
+          typeof obj.investigationDiagnosis === 'string' ? obj.investigationDiagnosis : '',
+        assessmentDate: legacyAssessmentDate,
+      });
+      return { sets: [set] };
+    }
+    if (Array.isArray(obj.sets)) {
+      return normalizeIbdInvestigations(
+        { sets: obj.sets.map((set) => normalizeIbdInvestigationSet(set as Partial<IbdInvestigationSet>)) },
+        legacyAssessmentDate,
+      );
+    }
+  }
+
+  return normalizeIbdInvestigations(null, legacyAssessmentDate);
 }
 
 export function serializeIbdInvestigations(data: IbdInvestigationsData): string {
-  return JSON.stringify(normalizeIbdInvestigations(data));
+  const normalized = normalizeIbdInvestigations(data);
+  if (normalized.sets.length === 0) {
+    return JSON.stringify({ sets: [emptyIbdInvestigationSet()] });
+  }
+  return JSON.stringify(normalized);
 }
 
-export function filledInvestigationEntries(data: IbdInvestigationsData): Array<{
+/** Primary assessment date — first set, kept in sync with legacy `dateMostRecentLabs`. */
+export function primaryInvestigationAssessmentDate(data: IbdInvestigationsData): string {
+  return data.sets[0]?.assessmentDate?.trim() ?? '';
+}
+
+export function filledInvestigationEntries(set: IbdInvestigationSet): Array<{
   groupTitle: string;
   label: string;
   value: string;
@@ -186,11 +263,21 @@ export function filledInvestigationEntries(data: IbdInvestigationsData): Array<{
   const entries: Array<{ groupTitle: string; label: string; value: string }> = [];
   for (const group of IBD_INVESTIGATION_GROUPS) {
     for (const field of group.fields) {
-      const value = data.values[field.id]?.trim() ?? '';
+      const value = set.values[field.id]?.trim() ?? '';
       if (value) {
         entries.push({ groupTitle: group.title, label: field.label, value });
       }
     }
   }
   return entries;
+}
+
+export function filledInvestigationSets(data: IbdInvestigationsData): Array<{
+  assessmentDate: string;
+  entries: ReturnType<typeof filledInvestigationEntries>;
+}> {
+  return data.sets.map((set) => ({
+    assessmentDate: set.assessmentDate.trim(),
+    entries: filledInvestigationEntries(set),
+  }));
 }

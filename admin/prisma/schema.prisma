@@ -49,6 +49,8 @@ diseaseBehavior        String @default("")
 perianalDisease        String @default("")
 montrealClass     String
 sesCdScoring         String @default("{}")
+hbiScoring           String @default("{}")
+partialMayoScoring   String @default("{}")
 sesCdClinicalNotes   String @default("")
 upperGiFindings      String @default("{}")
 ucEndoscopicScoring  String @default("{}")
@@ -64,6 +66,7 @@ activityScore          String @default("")
 
 dateMostRecentLabs   String
 ibdInvestigations    String @default("{}")
+radiologyInvestigations String @default("{}")
 
 currentIbdMedicationsRows String @default("[]")
 failedTreatments          String

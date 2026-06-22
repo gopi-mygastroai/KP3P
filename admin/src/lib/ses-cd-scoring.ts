@@ -1,3 +1,5 @@
+import { todayIsoDate } from './iso-date';
+
 export const SES_CD_SEGMENTS = [
   { id: 'terminalIleum', label: 'Terminal Ileum', maxScore: 3 },
   { id: 'rightColon', label: 'Right Colon', maxScore: 3 },
@@ -21,6 +23,8 @@ export type SesCdScores = Record<SesCdVariableId, Record<SesCdSegmentId, number 
 
 export type SesCdScoringData = {
   scores: SesCdScores;
+  /** ISO date (YYYY-MM-DD) when SES-CD scores were captured or observed. */
+  scoringDate?: string;
 };
 
 export const SES_CD_GRAND_TOTAL_MAX = 60;
@@ -134,20 +138,21 @@ export function scoreOptionsForCell(
 
 export function parseSesCdScoring(val: unknown): SesCdScoringData {
   const scores = emptyScores();
-  if (val == null || val === '') return { scores };
+  if (val == null || val === '') return { scores, scoringDate: '' };
 
   let raw: unknown = val;
   if (typeof val === 'string') {
     try {
       raw = JSON.parse(val);
     } catch {
-      return { scores };
+      return { scores, scoringDate: '' };
     }
   }
 
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { scores };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { scores, scoringDate: '' };
 
   const o = raw as Record<string, unknown>;
+  const scoringDate = typeof o.scoringDate === 'string' ? o.scoringDate : '';
   const source =
     o.scores && typeof o.scores === 'object' && !Array.isArray(o.scores)
       ? (o.scores as Record<string, unknown>)
@@ -161,7 +166,7 @@ export function parseSesCdScoring(val: unknown): SesCdScoringData {
     }
   }
 
-  return { scores };
+  return { scores, scoringDate };
 }
 
 /** Ensure every cell has the default score of 0. */
@@ -173,11 +178,14 @@ export function normalizeSesCdScoring(data: SesCdScoringData): SesCdScoringData 
       scores[v.id][s.id] = resolvedScore(raw);
     }
   }
-  return { scores };
+  return {
+    scores,
+    scoringDate: (typeof data.scoringDate === 'string' ? data.scoringDate.trim().substring(0, 10) : '') || todayIsoDate(),
+  };
 }
 
 export function serializeSesCdScoring(data: SesCdScoringData): string {
-  return JSON.stringify(data);
+  return JSON.stringify(normalizeSesCdScoring(data));
 }
 
 function cellValue(scores: SesCdScores, variableId: SesCdVariableId, segmentId: SesCdSegmentId): number {
@@ -225,5 +233,5 @@ export const SES_CD_INTERPRETATION_LEGEND =
   'SES-CD: 0 = Remission | 1-2 = Mild | 3-8 = Mild-Moderate | 9-16 = Moderate | >16 = Severe | Endoscopic Remission = SES-CD <= 2 | Response = >=50% reduction from baseline';
 
 export function emptySesCdScoring(): SesCdScoringData {
-  return { scores: emptyScores() };
+  return { scores: emptyScores(), scoringDate: todayIsoDate() };
 }

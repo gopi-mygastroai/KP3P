@@ -6,11 +6,30 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
   AdminStep1, AdminStep2, AdminStep4, AdminStep5,
-  AdminStep6, AdminStep8, AdminStep9
+  AdminStep6, AdminStep7, AdminStep8, AdminStep9
 } from './AdminAssessmentSteps';
 import type { PatientWithUser, AssessmentFormState, AssessmentUpdateFn } from '@/types/assessment-form';
 import { getErrorMessage } from '@/lib/get-error-message';
 import { montrealValidationMissing } from '@/lib/montreal-classification';
+import { parseIbdInvestigations } from '@/lib/ibd-investigations';
+import { parseRadiologyInvestigations } from '@/lib/radiology-investigations';
+import {
+  isFutureIsoDate,
+  normalizeUcEndoscopicScoring,
+  parseUcEndoscopicScoring,
+} from '@/lib/uc-endoscopic-scoring';
+import {
+  normalizeHarveyBradshawIndex,
+  parseHarveyBradshawIndex,
+} from '@/lib/harvey-bradshaw-index';
+import {
+  normalizePartialMayoScore,
+  parsePartialMayoScore,
+} from '@/lib/partial-mayo-score';
+import {
+  normalizeSesCdScoring,
+  parseSesCdScoring,
+} from '@/lib/ses-cd-scoring';
 import { performLogout } from '@/lib/logout-client';
 import {
   assessmentField,
@@ -27,6 +46,7 @@ const stepLabels = [
   "Disease Characteristics",
   "Symptoms",
   "Investigations",
+  "Radiology",
   "Treatment History",
   "Vaccination History",
   "Screening",
@@ -37,23 +57,25 @@ const stepHeadings = [
   "Disease Characteristics",
   "Disease Activity & Symptoms",
   "Laboratory & Investigations",
+  "Radiology Investigations",
   "Treatment History",
   "Vaccination History",
   "Infection Screening & Comorbidities",
 ];
 
-const ASSESSMENT_TOTAL_STEPS = 7;
+const ASSESSMENT_TOTAL_STEPS = 8;
 
-/** Map saved step index after removing the standalone Current Treatment step. */
+/** Map saved step index from prior 7-step assessments (before Radiology step). */
 function mapLegacyAssessmentStep(step: number): number {
-  if (step <= 5) return step;
-  return Math.min(step - 1, ASSESSMENT_TOTAL_STEPS);
+  if (step <= 4) return step;
+  if (step <= 7) return step + 1;
+  return ASSESSMENT_TOTAL_STEPS;
 }
 
 function clampAssessmentStep(step: unknown): number {
   const n = typeof step === 'number' ? step : parseInt(String(step ?? ''), 10);
   if (!Number.isFinite(n)) return 1;
-  return mapLegacyAssessmentStep(Math.min(Math.max(n, 1), 8));
+  return mapLegacyAssessmentStep(Math.min(Math.max(n, 1), 9));
 }
 
 function completedStepsBefore(step: number): Set<number> {
@@ -198,6 +220,28 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
       }
       if (surgeries.length === 0) missing.push('Previous IBD Surgeries');
 
+      if (data?.primaryDiagnosis === 'Ulcerative Colitis') {
+        const ucScoring = normalizeUcEndoscopicScoring(parseUcEndoscopicScoring(data.ucEndoscopicScoring));
+        if (isFutureIsoDate(ucScoring.scoringDate ?? '')) {
+          return 'UC Endoscopic Scoring date cannot be in the future';
+        }
+        const pMayo = normalizePartialMayoScore(parsePartialMayoScore(data.partialMayoScoring));
+        if (isFutureIsoDate(pMayo.assessmentDate ?? '')) {
+          return 'Partial Mayo Score assessment date cannot be in the future';
+        }
+      }
+
+      if (data?.primaryDiagnosis === "Crohn's Disease") {
+        const sesScoring = normalizeSesCdScoring(parseSesCdScoring(data.sesCdScoring));
+        if (isFutureIsoDate(sesScoring.scoringDate ?? '')) {
+          return 'SES-CD Scoring date cannot be in the future';
+        }
+        const hbi = normalizeHarveyBradshawIndex(parseHarveyBradshawIndex(data.hbiScoring));
+        if (isFutureIsoDate(hbi.assessmentDate ?? '')) {
+          return 'Harvey-Bradshaw Index assessment date cannot be in the future';
+        }
+      }
+
       if (missing.length > 0) {
         return missing.join(', ');
       }
@@ -218,18 +262,38 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
     }
 
     if (stepNum === 4) {
-      if (!String(assessmentField(data, 'dateMostRecentLabs') ?? '').trim()) {
-        return 'Date of Assessment';
+      const inv = parseIbdInvestigations(data.ibdInvestigations, data.dateMostRecentLabs);
+      if (inv.sets.length === 0) {
+        return 'At least one Laboratory & Investigations section is required';
+      }
+      const missingDates = inv.sets
+        .map((set, i) => (!String(set.assessmentDate ?? '').trim() ? `Date of Assessment (set ${i + 1})` : null))
+        .filter(Boolean);
+      if (missingDates.length > 0) {
+        return missingDates.join(', ');
       }
     }
 
     if (stepNum === 5) {
+      const radiology = parseRadiologyInvestigations(data.radiologyInvestigations);
+      if (radiology.sets.length === 0) {
+        return 'At least one Radiology Investigations section is required';
+      }
+      const missingDates = radiology.sets
+        .map((set, i) => (!String(set.assessmentDate ?? '').trim() ? `Date of Assessment (set ${i + 1})` : null))
+        .filter(Boolean);
+      if (missingDates.length > 0) {
+        return missingDates.join(', ');
+      }
+    }
+
+    if (stepNum === 6) {
       if (!String(assessmentField(data, 'responseToTreatment') ?? '').trim()) {
         return 'Response to Current Treatment';
       }
     }
 
-    if (stepNum === 7) {
+    if (stepNum === 8) {
       const missing: string[] = [];
       if (!isNonEmpty(data?.tbScreening)) missing.push('TB Screening Status');
       if (!isNonEmpty(data?.hepBSurfaceAg)) missing.push('Hepatitis B Surface Antigen');
@@ -594,10 +658,10 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
             style={{
               flex: 1,
               background: '#ffffff',
-              padding: currentStep === 4 ? '12px 16px' : '24px',
+              padding: currentStep === 4 || currentStep === 5 ? '12px 16px' : '24px',
               borderRadius: 12,
               border: '0.5px solid #e2e8f0',
-              marginBottom: currentStep === 4 ? 12 : 20,
+              marginBottom: currentStep === 4 || currentStep === 5 ? 12 : 20,
               fontFamily: "'Inter', sans-serif",
             }}
           >
@@ -605,9 +669,10 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
             {currentStep === 2 && <AdminStep4 data={formData} updateData={updateData} />}
             {currentStep === 3 && <AdminStep5 data={formData} updateData={updateData} />}
             {currentStep === 4 && <AdminStep6 data={formData} updateData={updateData} />}
-            {currentStep === 5 && <AdminStep8 data={formData} updateData={updateData} />}
-            {currentStep === 6 && <AdminStep2 data={formData} updateData={updateData} />}
-            {currentStep === 7 && <AdminStep9 data={formData} updateData={updateData} />}
+            {currentStep === 5 && <AdminStep7 data={formData} updateData={updateData} />}
+            {currentStep === 6 && <AdminStep8 data={formData} updateData={updateData} />}
+            {currentStep === 7 && <AdminStep2 data={formData} updateData={updateData} />}
+            {currentStep === 8 && <AdminStep9 data={formData} updateData={updateData} />}
           </div>
 
           {error && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 12, fontFamily: "'Inter', sans-serif" }}>{error}</p>}

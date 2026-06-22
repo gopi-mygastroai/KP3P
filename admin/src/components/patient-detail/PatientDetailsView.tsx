@@ -1,8 +1,17 @@
 import { composeMontrealClass, hasMontrealSelections, montrealFieldsForDiagnosis } from '@/lib/montreal-classification';
 import { formatSmokingSummary } from '@/lib/smoking';
-import { filledInvestigationEntries, parseIbdInvestigations } from '@/lib/ibd-investigations';
+import {
+  filledInvestigationSets,
+  parseIbdInvestigations,
+} from '@/lib/ibd-investigations';
+import {
+  filledRadiologySets,
+  parseRadiologyInvestigations,
+} from '@/lib/radiology-investigations';
 import {
   CurrentIbdMedicationsDisplay,
+  HbiScoringDisplay,
+  PartialMayoScoringDisplay,
   responseToTreatmentColor,
   SesCdScoringDisplay,
   UcEndoscopicScoringDisplay,
@@ -21,8 +30,12 @@ export default function PatientDetailsView({ patient }: Props) {
   const parseComorbidities = (() => {
     try { return JSON.parse(patient.comorbidities || '[]'); } catch { return []; }
   })();
-  const investigationData = parseIbdInvestigations(patient.ibdInvestigations);
-  const investigationEntries = filledInvestigationEntries(investigationData);
+  const investigationSets = filledInvestigationSets(
+    parseIbdInvestigations(patient.ibdInvestigations, patient.dateMostRecentLabs),
+  );
+  const radiologySets = filledRadiologySets(
+    parseRadiologyInvestigations(patient.radiologyInvestigations),
+  );
 
   const montrealClassDisplay = hasMontrealSelections(patient)
     ? composeMontrealClass(montrealFieldsForDiagnosis(patient.primaryDiagnosis, patient))
@@ -169,10 +182,14 @@ export default function PatientDetailsView({ patient }: Props) {
                   </div>
                 </div>
                 {patient.primaryDiagnosis === 'Ulcerative Colitis' && (
-                  <UcEndoscopicScoringDisplay raw={patient.ucEndoscopicScoring} />
+                  <>
+                    <PartialMayoScoringDisplay raw={patient.partialMayoScoring} />
+                    <UcEndoscopicScoringDisplay raw={patient.ucEndoscopicScoring} />
+                  </>
                 )}
                 {patient.primaryDiagnosis === "Crohn's Disease" && (
                   <>
+                    <HbiScoringDisplay raw={patient.hbiScoring} />
                     <SesCdScoringDisplay raw={patient.sesCdScoring} />
                     <UpperGiFindingsDisplay raw={patient.upperGiFindings} clinicalNotes={patient.sesCdClinicalNotes} />
                   </>
@@ -223,34 +240,54 @@ export default function PatientDetailsView({ patient }: Props) {
                 <span className="pr-card-title">Laboratory & Investigations</span>
                 <span className="pr-card-num">04</span>
               </div>
-              <div className="pr-field-grid">
-                <div className="pr-field">
-                  <div className="pr-field-label">Date of Assessment</div>
-                  <div className={`pr-field-value${!patient.dateMostRecentLabs ? ' empty' : ''}`}>{patient.dateMostRecentLabs || '—'}</div>
-                </div>
-              </div>
-              {investigationEntries.length > 0 ? (
-                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {Array.from(
-                    investigationEntries.reduce((groups, entry) => {
-                      const list = groups.get(entry.groupTitle) ?? [];
-                      list.push(entry);
-                      groups.set(entry.groupTitle, list);
-                      return groups;
-                    }, new Map<string, typeof investigationEntries>()),
-                  ).map(([groupTitle, entries]) => (
-                    <div key={groupTitle}>
-                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#475569', marginBottom: 8 }}>
-                        {groupTitle}
+              {investigationSets.some((set) => set.entries.length > 0 || set.assessmentDate) ? (
+                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  {investigationSets.map((set, setIndex) => (
+                    <div key={setIndex}>
+                      <div style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: '#475569',
+                        marginBottom: 8,
+                      }}>
+                        Laboratory &amp; Investigations {setIndex + 1}
+                        {set.assessmentDate ? ` — ${set.assessmentDate}` : ''}
                       </div>
-                      <div className="pr-field-grid">
-                        {entries.map((entry) => (
-                          <div className="pr-field" key={`${groupTitle}-${entry.label}`}>
-                            <div className="pr-field-label">{entry.label}</div>
-                            <div className="pr-field-value">{entry.value}</div>
+                      {set.entries.length > 0 ? (
+                        Array.from(
+                          set.entries.reduce((groups, entry) => {
+                            const list = groups.get(entry.groupTitle) ?? [];
+                            list.push(entry);
+                            groups.set(entry.groupTitle, list);
+                            return groups;
+                          }, new Map<string, typeof set.entries>()),
+                        ).map(([groupTitle, entries]) => (
+                          <div key={groupTitle} style={{ marginBottom: 16 }}>
+                            <div style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              letterSpacing: '0.06em',
+                              textTransform: 'uppercase',
+                              color: '#64748b',
+                              marginBottom: 8,
+                            }}>
+                              {groupTitle}
+                            </div>
+                            <div className="pr-field-grid">
+                              {entries.map((entry) => (
+                                <div className="pr-field" key={`${groupTitle}-${entry.label}`}>
+                                  <div className="pr-field-label">{entry.label}</div>
+                                  <div className="pr-field-value">{entry.value}</div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        ))}
-                      </div>
+                        ))
+                      ) : (
+                        <p style={{ color: '#94a3b8', fontSize: 13 }}>No investigation values recorded for this set.</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -259,12 +296,54 @@ export default function PatientDetailsView({ patient }: Props) {
               )}
             </div>
 
-            {/* 05 Treatment History */}
+            {/* 05 Radiology */}
+            <div className="pr-card">
+              <div className="pr-card-head">
+                <div className="pr-card-icon" style={{ background: '#eff6ff' }}>🩻</div>
+                <span className="pr-card-title">Radiology Investigations</span>
+                <span className="pr-card-num">05</span>
+              </div>
+              {radiologySets.some((set) => set.entries.length > 0 || set.assessmentDate) ? (
+                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  {radiologySets.map((set, setIndex) => (
+                    <div key={setIndex}>
+                      <div style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: '#475569',
+                        marginBottom: 8,
+                      }}>
+                        Radiology Investigations {setIndex + 1}
+                        {set.assessmentDate ? ` — ${set.assessmentDate}` : ''}
+                      </div>
+                      {set.entries.length > 0 ? (
+                        <div className="pr-field-grid">
+                          {set.entries.map((entry) => (
+                            <div className="pr-field" key={`${setIndex}-${entry.label}`}>
+                              <div className="pr-field-label">{entry.label}</div>
+                              <div className="pr-field-value">{entry.value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p style={{ color: '#94a3b8', fontSize: 13 }}>No radiology values recorded for this set.</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ marginTop: 12, color: '#94a3b8', fontSize: 13 }}>No radiology investigations recorded.</p>
+              )}
+            </div>
+
+            {/* 06 Treatment History */}
             <div className="pr-card">
               <div className="pr-card-head">
                 <div className="pr-card-icon" style={{ background: '#fff1f2' }}>💊</div>
                 <span className="pr-card-title">Treatment History</span>
-                <span className="pr-card-num">05</span>
+                <span className="pr-card-num">06</span>
               </div>
               <CurrentIbdMedicationsDisplay raw={patient.currentIbdMedicationsRows} />
               <div className="pr-field-grid" style={{ paddingTop: 4 }}>
@@ -297,12 +376,12 @@ export default function PatientDetailsView({ patient }: Props) {
               </div>
             </div>
 
-            {/* 06 Serology */}
+            {/* 07 Serology */}
             <div className="pr-card">
               <div className="pr-card-head">
                 <div className="pr-card-icon" style={{ background: '#fff0f9' }}>🩸</div>
                 <span className="pr-card-title">Infection Screening & Serology</span>
-                <span className="pr-card-num">06</span>
+                <span className="pr-card-num">07</span>
               </div>
               <div className="pr-serology-grid">
                 {[
@@ -321,12 +400,12 @@ export default function PatientDetailsView({ patient }: Props) {
               </div>
             </div>
 
-            {/* 07 Vaccination */}
+            {/* 08 Vaccination */}
             <div className="pr-card">
               <div className="pr-card-head">
                 <div className="pr-card-icon" style={{ background: '#f0fdf4' }}>💉</div>
                 <span className="pr-card-title">Vaccination History</span>
-                <span className="pr-card-num">07</span>
+                <span className="pr-card-num">08</span>
               </div>
               <div className="pr-vaccine-grid">
                 {renderVaccineCard('Influenza', patient.influenza)}
@@ -342,12 +421,12 @@ export default function PatientDetailsView({ patient }: Props) {
               </div>
             </div>
 
-            {/* 08 Comorbidities */}
+            {/* 09 Comorbidities */}
             <div className="pr-card">
               <div className="pr-card-head">
                 <div className="pr-card-icon" style={{ background: '#eef2ff' }}>📋</div>
                 <span className="pr-card-title">Comorbidities & Final Details</span>
-                <span className="pr-card-num">08</span>
+                <span className="pr-card-num">09</span>
               </div>
               <div className="pr-field-grid">
                 <div className="pr-field">

@@ -3,16 +3,15 @@
 import React from 'react';
 import type { AssessmentFormState, AssessmentUpdateFn } from '@/types/assessment-form';
 import {
-  emptyIbdInvestigationSet,
-  IBD_INVESTIGATION_GROUPS,
-  normalizeIbdInvestigations,
-  parseIbdInvestigations,
-  primaryInvestigationAssessmentDate,
-  serializeIbdInvestigations,
-  type IbdInvestigationFieldId,
-  type IbdInvestigationSet,
-  type IbdInvestigationsData,
-} from '@/lib/ibd-investigations';
+  emptyRadiologyInvestigationSet,
+  normalizeRadiologyInvestigations,
+  parseRadiologyInvestigations,
+  RADIOLOGY_INVESTIGATION_FIELDS,
+  serializeRadiologyInvestigations,
+  type RadiologyInvestigationFieldId,
+  type RadiologyInvestigationSet,
+  type RadiologyInvestigationsData,
+} from '@/lib/radiology-investigations';
 
 const inter = "'Inter', sans-serif";
 
@@ -50,19 +49,6 @@ const headerCell: React.CSSProperties = {
   lineHeight: 1.2,
 };
 
-const groupCell: React.CSSProperties = {
-  padding: '4px 8px',
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
-  color: '#0f172a',
-  background: '#f1f5f9',
-  borderBottom: '1px solid #e2e8f0',
-  fontFamily: inter,
-  lineHeight: 1.2,
-};
-
 const labelCell: React.CSSProperties = {
   padding: '4px 8px',
   fontSize: 12,
@@ -83,34 +69,28 @@ const valueCell: React.CSSProperties = {
   verticalAlign: 'middle',
 };
 
-type IbdInvestigationsFormProps = {
+type Props = {
   data: AssessmentFormState;
   updateData: AssessmentUpdateFn;
 };
 
-function readInvestigations(data: AssessmentFormState): IbdInvestigationsData {
-  return parseIbdInvestigations(data.ibdInvestigations, data.dateMostRecentLabs);
-}
-
-type InvestigationSetBlockProps = {
+type SetBlockProps = {
   setIndex: number;
-  set: IbdInvestigationSet;
+  set: RadiologyInvestigationSet;
   canRemove: boolean;
-  onUpdate: (patch: Partial<IbdInvestigationSet>) => void;
+  onUpdate: (patch: Partial<RadiologyInvestigationSet>) => void;
   onRemove: () => void;
 };
 
-function InvestigationSetBlock({
+function RadiologySetBlock({
   setIndex,
   set,
   canRemove,
   onUpdate,
   onRemove,
-}: InvestigationSetBlockProps) {
-  const setFieldValue = (fieldId: IbdInvestigationFieldId, value: string) => {
-    onUpdate({
-      values: { ...set.values, [fieldId]: value },
-    });
+}: SetBlockProps) {
+  const setFieldValue = (fieldId: RadiologyInvestigationFieldId, value: string) => {
+    onUpdate({ [fieldId]: value });
   };
 
   return (
@@ -139,7 +119,7 @@ function InvestigationSetBlock({
           color: '#475569',
           fontFamily: inter,
         }}>
-          Laboratory &amp; Investigations {setIndex + 1}
+          Radiology Investigations {setIndex + 1}
         </h4>
         {canRemove && (
           <button
@@ -166,8 +146,8 @@ function InvestigationSetBlock({
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
           <thead>
             <tr>
-              <th style={{ ...headerCell, width: '58%', textAlign: 'left' }}>Parameter</th>
-              <th style={{ ...headerCell, width: '42%', textAlign: 'left' }}>Value</th>
+              <th style={{ ...headerCell, width: '40%', textAlign: 'left' }}>Parameter</th>
+              <th style={{ ...headerCell, width: '60%', textAlign: 'left' }}>Value</th>
             </tr>
           </thead>
           <tbody>
@@ -187,27 +167,20 @@ function InvestigationSetBlock({
                 />
               </td>
             </tr>
-            {IBD_INVESTIGATION_GROUPS.map((group) => (
-              <React.Fragment key={group.id}>
-                <tr>
-                  <td colSpan={2} style={groupCell}>{group.title}</td>
-                </tr>
-                {group.fields.map((field) => (
-                  <tr key={field.id}>
-                    <td style={labelCell}>{field.label}</td>
-                    <td style={valueCell}>
-                      <input
-                        type="text"
-                        style={inputStyle}
-                        value={set.values[field.id] || ''}
-                        onChange={(e) => setFieldValue(field.id, e.target.value)}
-                        onFocus={(e) => { e.target.style.borderColor = '#0891b2'; }}
-                        onBlur={(e) => { e.target.style.borderColor = '#cbd5e1'; }}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </React.Fragment>
+            {RADIOLOGY_INVESTIGATION_FIELDS.map((field) => (
+              <tr key={field.id}>
+                <td style={labelCell}>{field.label}</td>
+                <td style={valueCell}>
+                  <input
+                    type="text"
+                    style={inputStyle}
+                    value={set[field.id] || ''}
+                    onChange={(e) => setFieldValue(field.id, e.target.value)}
+                    onFocus={(e) => { e.target.style.borderColor = '#0891b2'; }}
+                    onBlur={(e) => { e.target.style.borderColor = '#cbd5e1'; }}
+                  />
+                </td>
+              </tr>
             ))}
           </tbody>
         </table>
@@ -216,45 +189,43 @@ function InvestigationSetBlock({
   );
 }
 
-export default function IbdInvestigationsForm({ data, updateData }: IbdInvestigationsFormProps) {
-  const investigations = readInvestigations(data);
+export default function RadiologyInvestigationsForm({ data, updateData }: Props) {
+  const radiology = parseRadiologyInvestigations(data.radiologyInvestigations);
 
-  const persistInvestigations = (next: IbdInvestigationsData) => {
-    const normalized = normalizeIbdInvestigations(next);
+  const persistRadiology = (next: RadiologyInvestigationsData) => {
     updateData({
-      ibdInvestigations: serializeIbdInvestigations(normalized),
-      dateMostRecentLabs: primaryInvestigationAssessmentDate(normalized),
+      radiologyInvestigations: serializeRadiologyInvestigations(normalizeRadiologyInvestigations(next)),
     });
   };
 
-  const updateSet = (setIndex: number, patch: Partial<IbdInvestigationSet>) => {
-    const sets = investigations.sets.map((set, i) =>
+  const updateSet = (setIndex: number, patch: Partial<RadiologyInvestigationSet>) => {
+    const sets = radiology.sets.map((set, i) =>
       i === setIndex ? { ...set, ...patch } : set,
     );
-    persistInvestigations({ sets });
+    persistRadiology({ sets });
   };
 
   const addSet = () => {
-    persistInvestigations({
-      sets: [...investigations.sets, emptyIbdInvestigationSet()],
+    persistRadiology({
+      sets: [...radiology.sets, emptyRadiologyInvestigationSet()],
     });
   };
 
   const removeSet = (setIndex: number) => {
-    if (investigations.sets.length <= 1) return;
-    persistInvestigations({
-      sets: investigations.sets.filter((_, i) => i !== setIndex),
+    if (radiology.sets.length <= 1) return;
+    persistRadiology({
+      sets: radiology.sets.filter((_, i) => i !== setIndex),
     });
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {investigations.sets.map((set, setIndex) => (
-        <InvestigationSetBlock
+      {radiology.sets.map((set, setIndex) => (
+        <RadiologySetBlock
           key={setIndex}
           setIndex={setIndex}
           set={set}
-          canRemove={investigations.sets.length > 1}
+          canRemove={setIndex > 0}
           onUpdate={(patch) => updateSet(setIndex, patch)}
           onRemove={() => removeSet(setIndex)}
         />
@@ -276,7 +247,7 @@ export default function IbdInvestigationsForm({ data, updateData }: IbdInvestiga
           cursor: 'pointer',
         }}
       >
-        + Add additional Lab &amp; Investigations
+        + Add additional Radiology Investigations
       </button>
     </div>
   );

@@ -8,6 +8,7 @@ import {
   AdminStep4,
   AdminStep5,
   AdminStep6,
+  AdminStep7,
   AdminStep8,
   AdminStep9,
 } from '@/app/admin/patient/[id]/assessment/AdminAssessmentSteps';
@@ -20,6 +21,7 @@ const STEP_LABELS = [
   'Disease Characteristics',
   'Symptoms',
   'Investigations',
+  'Radiology',
   'Treatment History',
   'Vaccination History',
   'Screening',
@@ -30,6 +32,7 @@ const STEP_HEADINGS = [
   'Disease Characteristics',
   'Disease Activity & Symptoms',
   'Laboratory & Investigations',
+  'Radiology Investigations',
   'Treatment History',
   'Vaccination History',
   'Infection Screening & Comorbidities',
@@ -40,6 +43,7 @@ const STEP_COMPONENTS = [
   AdminStep4,
   AdminStep5,
   AdminStep6,
+  AdminStep7,
   AdminStep8,
   AdminStep2,
   AdminStep9,
@@ -58,7 +62,7 @@ const SECTIONS: SectionConfig[] = STEP_LABELS.map((stepLabel, index) => ({
   stepLabel,
   heading: STEP_HEADINGS[index],
   Component: STEP_COMPONENTS[index],
-  compact: index === 3,
+  compact: index === 3 || index === 4,
 }));
 
 type Props = {

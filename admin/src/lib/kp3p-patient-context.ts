@@ -7,6 +7,16 @@ import {
   type CurrentIbdMedicationRow,
 } from './current-ibd-medications';
 import { parseSesCdScoring } from './ses-cd-scoring';
+import {
+  hbiInterpretation,
+  hbiTotal,
+  parseHarveyBradshawIndex,
+} from './harvey-bradshaw-index';
+import {
+  partialMayoInterpretation,
+  partialMayoTotal,
+  parsePartialMayoScore,
+} from './partial-mayo-score';
 import { parseUpperGiFindings, UPPER_GI_SEGMENTS } from './upper-gi-findings';
 import { parseUcEndoscopicScoring, uceisTotal } from './uc-endoscopic-scoring';
 
@@ -58,13 +68,20 @@ export function formatMedicationHistoryForPrompt(rowsRaw: unknown): string {
 }
 
 export function formatInvestigationsForPrompt(ibdInvestigationsRaw: unknown, date?: string): string {
-  const entries = filledInvestigationEntries(parseIbdInvestigations(ibdInvestigationsRaw));
-  if (entries.length === 0) return 'None documented';
-  const datePrefix = date?.trim() ? `Assessment date ${date.trim()}; ` : '';
-  return (
-    datePrefix +
-    entries.map((e) => `${e.label}=${e.value}`).join('; ')
-  );
+  const data = parseIbdInvestigations(ibdInvestigationsRaw, date);
+  const parts = data.sets
+    .map((set, index) => {
+      const entries = filledInvestigationEntries(set);
+      const datePrefix = set.assessmentDate.trim()
+        ? `Assessment date ${set.assessmentDate.trim()}`
+        : `Set ${index + 1}`;
+      if (entries.length === 0) {
+        return set.assessmentDate.trim() ? `${datePrefix}: no values recorded` : null;
+      }
+      return `${datePrefix}: ${entries.map((e) => `${e.label}=${e.value}`).join('; ')}`;
+    })
+    .filter(Boolean);
+  return parts.length ? parts.join(' || ') : 'None documented';
 }
 
 export function formatEndoscopicDataForPrompt(input: {
@@ -80,7 +97,8 @@ export function formatEndoscopicDataForPrompt(input: {
     Object.values(seg).some((v) => v != null && v !== 0),
   );
   if (sesFilled) {
-    parts.push('SES-CD scoring recorded (see segment scores in assessment data)');
+    const dateNote = ses.scoringDate?.trim() ? ` (scoring date: ${ses.scoringDate.trim()})` : '';
+    parts.push(`SES-CD scoring recorded${dateNote} (see segment scores in assessment data)`);
   }
 
   const upperGi = parseUpperGiFindings(input.upperGiFindings);
@@ -95,12 +113,29 @@ export function formatEndoscopicDataForPrompt(input: {
   const mayoTotal = uc.mayoEndoscopicScore;
   const uceisTotalScore = uceisTotal(uc.uceis);
   if (mayoTotal > 0 || uceisTotalScore > 0) {
-    parts.push(`UC endoscopic: Mayo=${mayoTotal}, UCEIS total=${uceisTotalScore}`);
+    const dateNote = uc.scoringDate?.trim() ? ` (scoring date: ${uc.scoringDate.trim()})` : '';
+    parts.push(`UC endoscopic${dateNote}: Mayo=${mayoTotal}, UCEIS total=${uceisTotalScore}`);
   }
 
   if (input.sesCdClinicalNotes?.trim()) parts.push(`Clinical notes: ${input.sesCdClinicalNotes.trim()}`);
 
   return parts.length ? parts.join(' | ') : 'Not provided';
+}
+
+export function formatHbiForPrompt(hbiScoringRaw: unknown): string {
+  const hbi = parseHarveyBradshawIndex(hbiScoringRaw);
+  const total = hbiTotal(hbi);
+  const interpretation = hbiInterpretation(total);
+  const dateNote = hbi.assessmentDate?.trim() ? `assessment date ${hbi.assessmentDate.trim()}, ` : '';
+  return `${dateNote}total ${total} (${interpretation.label}): wellbeing=${hbi.generalWellbeing}, pain=${hbi.abdominalPain}, stools=${hbi.liquidSoftStools}, mass=${hbi.abdominalMass}, complications=${hbi.complications}`;
+}
+
+export function formatPartialMayoForPrompt(partialMayoScoringRaw: unknown): string {
+  const pMayo = parsePartialMayoScore(partialMayoScoringRaw);
+  const total = partialMayoTotal(pMayo);
+  const interpretation = partialMayoInterpretation(total);
+  const dateNote = pMayo.assessmentDate?.trim() ? `assessment date ${pMayo.assessmentDate.trim()}, ` : '';
+  return `${dateNote}total ${total}/9 (${interpretation.label}): stool frequency=${pMayo.stoolFrequency}, rectal bleeding=${pMayo.rectalBleeding}, PGA=${pMayo.physiciansGlobalAssessment}; action=${interpretation.action}`;
 }
 
 export function hasPriorMedicationHistory(rowsRaw: unknown, priorFailed?: string): boolean {

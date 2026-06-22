@@ -56,6 +56,8 @@ async function main() {
           perianalDisease: patient.perianalDisease || '',
           montrealClass: patient.montrealClass || '',
           sesCdScoring: patient.sesCdScoring || '{}',
+          hbiScoring: patient.hbiScoring || '{}',
+          partialMayoScoring: patient.partialMayoScoring || '{}',
           sesCdClinicalNotes: patient.sesCdClinicalNotes || '',
           upperGiFindings: patient.upperGiFindings || '{}',
           ucEndoscopicScoring: patient.ucEndoscopicScoring || '{}',
@@ -70,6 +72,7 @@ async function main() {
           
           dateMostRecentLabs: patient.dateMostRecentLabs || '',
           ibdInvestigations: patient.ibdInvestigations || '{}',
+          radiologyInvestigations: patient.radiologyInvestigations || '{}',
           currentIbdMedicationsRows: patient.currentIbdMedicationsRows || '[]',
           failedTreatments: patient.failedTreatments || '',
           responseToTreatment: patient.responseToTreatment || '',

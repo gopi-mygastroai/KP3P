@@ -144,6 +144,7 @@ export default function SesCdScoringTable({ data, updateData }: Props) {
 
   const setScore = (variableId: SesCdVariableId, segmentId: SesCdSegmentId, raw: string) => {
     const next: SesCdScoringData = {
+      ...sesCd,
       scores: JSON.parse(JSON.stringify(scores)) as SesCdScoringData['scores'],
     };
     next.scores[variableId][segmentId] = Number(raw);

@@ -1,3 +1,19 @@
+import {
+  HBI_ABDOMINAL_MASS_OPTIONS,
+  HBI_ABDOMINAL_PAIN_OPTIONS,
+  HBI_GENERAL_WELLBEING_OPTIONS,
+  hbiInterpretation,
+  hbiTotal,
+  parseHarveyBradshawIndex,
+} from '@/lib/harvey-bradshaw-index';
+import {
+  PMAYO_PGA_OPTIONS,
+  PMAYO_RECTAL_BLEEDING_OPTIONS,
+  PMAYO_STOOL_FREQUENCY_OPTIONS,
+  partialMayoInterpretation,
+  partialMayoTotal,
+  parsePartialMayoScore,
+} from '@/lib/partial-mayo-score';
 import type { CSSProperties } from 'react';
 import {
   CURRENT_IBD_MEDICATION_CATALOG,
@@ -127,6 +143,106 @@ function displayCell(value: string): string {
   return value.trim() || '—';
 }
 
+function hbiScoreLabel(options: readonly { score: number; label: string }[], score: number): string {
+  return options.find((o) => o.score === score)?.label ?? String(score);
+}
+
+export function PartialMayoScoringDisplay({ raw }: { raw: unknown }) {
+  const pMayo = parsePartialMayoScore(raw);
+  const total = partialMayoTotal(pMayo);
+  const interpretation = partialMayoInterpretation(total);
+
+  return (
+    <div className="pr-field-section" style={{ margin: '4px 8px 12px' }}>
+      <div className="pr-field-section-title" style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+        <span>Partial Mayo Score (pMayo)</span>
+        {pMayo.assessmentDate?.trim() ? (
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'none', letterSpacing: 0 }}>
+            Assessment date: {pMayo.assessmentDate.trim()}
+          </span>
+        ) : null}
+        <span style={{ fontSize: 13, fontWeight: 700, color: interpretation.color, textTransform: 'none', letterSpacing: 0 }}>
+          Total: {total} / 9 — {interpretation.display}
+        </span>
+      </div>
+      <div className="pr-field-grid">
+        <div className="pr-field">
+          <div className="pr-field-label">Stool Frequency</div>
+          <div className="pr-field-value">{hbiScoreLabel(PMAYO_STOOL_FREQUENCY_OPTIONS, pMayo.stoolFrequency)}</div>
+        </div>
+        <div className="pr-field">
+          <div className="pr-field-label">Rectal Bleeding</div>
+          <div className="pr-field-value">{hbiScoreLabel(PMAYO_RECTAL_BLEEDING_OPTIONS, pMayo.rectalBleeding)}</div>
+        </div>
+        <div className="pr-field">
+          <div className="pr-field-label">Physician&apos;s Global Assessment</div>
+          <div className="pr-field-value">{hbiScoreLabel(PMAYO_PGA_OPTIONS, pMayo.physiciansGlobalAssessment)}</div>
+        </div>
+        <div className="pr-field" style={{ gridColumn: '1 / -1' }}>
+          <div className="pr-field-label">Disease Activity</div>
+          <div className="pr-field-value" style={{ color: interpretation.color, fontWeight: 600 }}>
+            {interpretation.display} — {interpretation.clinicalMeaning}
+          </div>
+        </div>
+        <div className="pr-field" style={{ gridColumn: '1 / -1' }}>
+          <div className="pr-field-label">Recommended Action</div>
+          <div className="pr-field-value">{interpretation.action}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function HbiScoringDisplay({ raw }: { raw: unknown }) {
+  const hbi = parseHarveyBradshawIndex(raw);
+  const total = hbiTotal(hbi);
+  const interpretation = hbiInterpretation(total);
+
+  return (
+    <div className="pr-field-section" style={{ margin: '4px 8px 12px' }}>
+      <div className="pr-field-section-title" style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+        <span>Harvey-Bradshaw Index (HBI)</span>
+        {hbi.assessmentDate?.trim() ? (
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'none', letterSpacing: 0 }}>
+            Assessment date: {hbi.assessmentDate.trim()}
+          </span>
+        ) : null}
+        <span style={{ fontSize: 13, fontWeight: 700, color: interpretation.color, textTransform: 'none', letterSpacing: 0 }}>
+          Total: {total} — {interpretation.display}
+        </span>
+      </div>
+      <div className="pr-field-grid">
+        <div className="pr-field">
+          <div className="pr-field-label">General Well-being</div>
+          <div className="pr-field-value">{hbiScoreLabel(HBI_GENERAL_WELLBEING_OPTIONS, hbi.generalWellbeing)}</div>
+        </div>
+        <div className="pr-field">
+          <div className="pr-field-label">Abdominal Pain</div>
+          <div className="pr-field-value">{hbiScoreLabel(HBI_ABDOMINAL_PAIN_OPTIONS, hbi.abdominalPain)}</div>
+        </div>
+        <div className="pr-field">
+          <div className="pr-field-label">Liquid / Soft Stools (24h)</div>
+          <div className="pr-field-value">{hbi.liquidSoftStools}</div>
+        </div>
+        <div className="pr-field">
+          <div className="pr-field-label">Abdominal Mass</div>
+          <div className="pr-field-value">{hbiScoreLabel(HBI_ABDOMINAL_MASS_OPTIONS, hbi.abdominalMass)}</div>
+        </div>
+        <div className="pr-field">
+          <div className="pr-field-label">Complications</div>
+          <div className="pr-field-value">{hbi.complications}</div>
+        </div>
+        <div className="pr-field" style={{ gridColumn: '1 / -1' }}>
+          <div className="pr-field-label">Disease Activity</div>
+          <div className="pr-field-value" style={{ color: interpretation.color, fontWeight: 600 }}>
+            {interpretation.display} — {interpretation.clinicalMeaning}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function UcEndoscopicScoringDisplay({ raw }: { raw: unknown }) {
   const uc = parseUcEndoscopicScoring(raw);
   const mayo = uc.mayoEndoscopicScore;
@@ -139,7 +255,14 @@ export function UcEndoscopicScoringDisplay({ raw }: { raw: unknown }) {
 
   return (
     <div className="pr-field-section" style={{ margin: '4px 8px 12px' }}>
-      <div className="pr-field-section-title">UC Endoscopic Scoring</div>
+      <div className="pr-field-section-title" style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+        <span>UC Endoscopic Scoring</span>
+        {uc.scoringDate?.trim() ? (
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'none', letterSpacing: 0 }}>
+            Scoring date: {uc.scoringDate.trim()}
+          </span>
+        ) : null}
+      </div>
       <div className="pr-field-grid">
         <div className="pr-field">
           <div className="pr-field-label">{MAYO_FIELD_LABEL}</div>
@@ -177,7 +300,7 @@ export function UcEndoscopicScoringDisplay({ raw }: { raw: unknown }) {
 }
 
 export function SesCdScoringDisplay({ raw }: { raw: unknown }) {
-  const { scores } = parseSesCdScoring(raw);
+  const { scores, scoringDate } = parseSesCdScoring(raw);
   const grandTotal = sesCdGrandTotal(scores);
   const interpretation = sesCdInterpretation(grandTotal);
 
@@ -185,6 +308,11 @@ export function SesCdScoringDisplay({ raw }: { raw: unknown }) {
     <div className="pr-field-section" style={{ margin: '4px 8px 12px' }}>
       <div className="pr-field-section-title" style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
         <span>SES-CD Scoring</span>
+        {scoringDate?.trim() ? (
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'none', letterSpacing: 0 }}>
+            Scoring date: {scoringDate.trim()}
+          </span>
+        ) : null}
         <span style={{ fontSize: 13, fontWeight: 700, color: interpretation.color, textTransform: 'none', letterSpacing: 0 }}>
           Total: {grandTotal} / 60 — {interpretation.display}
         </span>

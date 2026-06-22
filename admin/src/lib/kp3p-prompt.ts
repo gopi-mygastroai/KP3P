@@ -1,10 +1,13 @@
 import {
   formatEndoscopicDataForPrompt,
+  formatHbiForPrompt,
+  formatPartialMayoForPrompt,
   formatInvestigationsForPrompt,
   formatMedicationHistoryForPrompt,
   hasPriorMedicationHistory,
   montrealDetailLine,
 } from './kp3p-patient-context';
+import { formatRadiologyForPrompt } from './radiology-investigations';
 
 export interface PatientData {
   name: string; id: string; age: number; sex: string; occupation: string;
@@ -37,8 +40,11 @@ export interface PatientData {
   impactOnQoL?: string;
   currentIbdMedicationsRows?: string;
   ibdInvestigations?: string;
+  radiologyInvestigations?: string;
   investigationsDate?: string;
   sesCdScoring?: string;
+  hbiScoring?: string;
+  partialMayoScoring?: string;
   upperGiFindings?: string;
   ucEndoscopicScoring?: string;
   sesCdClinicalNotes?: string;
@@ -84,6 +90,13 @@ function patientContext(patient: PatientData) {
     ucEndoscopicScoring: patient.ucEndoscopicScoring,
     sesCdClinicalNotes: patient.sesCdClinicalNotes,
   });
+  const hbiSummary = patient.hbiScoring ? formatHbiForPrompt(patient.hbiScoring) : 'Not provided';
+  const partialMayoSummary = patient.partialMayoScoring
+    ? formatPartialMayoForPrompt(patient.partialMayoScoring)
+    : 'Not provided';
+  const radiologySummary = patient.radiologyInvestigations
+    ? formatRadiologyForPrompt(patient.radiologyInvestigations)
+    : 'Not provided';
   const priorMedsAck = hasPriorMedicationHistory(
     patient.currentIbdMedicationsRows,
     patient.priorFailed,
@@ -92,6 +105,9 @@ function patientContext(patient: PatientData) {
   return {
     medicationHistory,
     endoscopicSummary,
+    hbiSummary,
+    partialMayoSummary,
+    radiologySummary,
     montrealDetails: montrealDetailLine(patient),
     priorMedsAck,
   };
@@ -360,7 +376,10 @@ Prior Surgeries: ${patient.priorSurgeries ?? 'None'}
 Severity: ${patient.severity} | Activity score: ${patient.activityScore ?? 'N/A'} | Bowel Freq: ${patient.bowelFreq ?? 'N/A'} | Blood: ${patient.bloodInStool ?? 'N/A'}
 Pain: ${patient.abdPain ?? 'N/A'} | QoL impact: ${patient.impactOnQoL ?? 'N/A'} | Weight Loss: ${patient.weightLoss ?? 'N/A'}
 Labs / Investigations: ${labsLine(patient)}
+Radiology Investigations: ${ctx.radiologySummary}
 Endoscopic data: ${ctx.endoscopicSummary}
+Harvey-Bradshaw Index (HBI): ${ctx.hbiSummary}
+Partial Mayo Score (pMayo): ${ctx.partialMayoSummary}
 Medication history (structured): ${ctx.medicationHistory}
 Treatment response: ${patient.treatmentResponse ?? 'N/A'} | Failed treatment details: ${patient.priorFailed ?? 'None'}
 TB: ${patient.tbStatus ?? 'Not documented'} | HBsAg: ${patient.hbsAg ?? 'Not tested'} | Anti-HBs: ${patient.antiHBs ?? 'Not tested'} | Anti-HBc: ${patient.antiHBc ?? 'Not tested'}

@@ -1,6 +1,16 @@
 import { composeMontrealClass, hasMontrealSelections, montrealFieldsForDiagnosis } from '@/lib/montreal-classification';
 import { normalizeSesCdScoring, parseSesCdScoring, serializeSesCdScoring } from '@/lib/ses-cd-scoring';
 import {
+  normalizeHarveyBradshawIndex,
+  parseHarveyBradshawIndex,
+  serializeHarveyBradshawIndex,
+} from '@/lib/harvey-bradshaw-index';
+import {
+  normalizePartialMayoScore,
+  parsePartialMayoScore,
+  serializePartialMayoScore,
+} from '@/lib/partial-mayo-score';
+import {
   normalizeUpperGiFindings,
   parseUpperGiFindings,
   serializeUpperGiFindings,
@@ -15,8 +25,14 @@ import { normalizeSmokingStatusForForm } from '@/lib/smoking';
 import {
   normalizeIbdInvestigations,
   parseIbdInvestigations,
+  primaryInvestigationAssessmentDate,
   serializeIbdInvestigations,
 } from '@/lib/ibd-investigations';
+import {
+  normalizeRadiologyInvestigations,
+  parseRadiologyInvestigations,
+  serializeRadiologyInvestigations,
+} from '@/lib/radiology-investigations';
 import {
   normalizeCurrentIbdMedications,
   parseCurrentIbdMedications,
@@ -57,6 +73,14 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
     normalizeSesCdScoring(parseSesCdScoring(patient.sesCdScoring)),
   );
 
+  const hbiScoring = serializeHarveyBradshawIndex(
+    normalizeHarveyBradshawIndex(parseHarveyBradshawIndex(patient.hbiScoring)),
+  );
+
+  const partialMayoScoring = serializePartialMayoScore(
+    normalizePartialMayoScore(parsePartialMayoScore(patient.partialMayoScoring)),
+  );
+
   const upperGiFindings = serializeUpperGiFindings(
     normalizeUpperGiFindings(parseUpperGiFindings(patient.upperGiFindings)),
   );
@@ -65,8 +89,14 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
     normalizeUcEndoscopicScoring(parseUcEndoscopicScoring(patient.ucEndoscopicScoring)),
   );
 
-  const parsedInvestigations = parseIbdInvestigations(patient.ibdInvestigations);
+  const parsedInvestigations = parseIbdInvestigations(
+    patient.ibdInvestigations,
+    patient.dateMostRecentLabs,
+  );
   const ibdInvestigations = serializeIbdInvestigations(parsedInvestigations);
+
+  const parsedRadiology = parseRadiologyInvestigations(patient.radiologyInvestigations);
+  const radiologyInvestigations = serializeRadiologyInvestigations(parsedRadiology);
 
   const currentIbdMedicationsRows = serializeCurrentIbdMedications(
     normalizeCurrentIbdMedications(parseCurrentIbdMedications(patient.currentIbdMedicationsRows)),
@@ -78,15 +108,23 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
     comorbidities,
     montrealClass,
     sesCdScoring,
+    hbiScoring,
+    partialMayoScoring,
     upperGiFindings,
     ucEndoscopicScoring,
     ibdInvestigations,
+    radiologyInvestigations,
     currentIbdMedicationsRows,
+    dateMostRecentLabs: primaryInvestigationAssessmentDate(parsedInvestigations) || patient.dateMostRecentLabs,
     mmr: patient.mmr ?? '{}',
     varicella: patient.varicella ?? '{}',
     smokingStatus: normalizeSmokingStatusForForm(patient.smokingStatus),
     smokingDetails: patient.smokingDetails ?? '',
     preferredLanguage: preferredLanguageScalarForForm(patient.preferredLanguage),
+    pregnancyPlanning:
+      patient.pregnancyPlanning === 'Not applicable (male/post-menopausal)'
+        ? 'Not applicable'
+        : patient.pregnancyPlanning,
   };
 }
 
@@ -114,6 +152,8 @@ const PATIENT_SAVE_FIELD_KEYS = [
   'perianalDisease',
   'montrealClass',
   'sesCdScoring',
+  'hbiScoring',
+  'partialMayoScoring',
   'sesCdClinicalNotes',
   'upperGiFindings',
   'ucEndoscopicScoring',
@@ -127,6 +167,7 @@ const PATIENT_SAVE_FIELD_KEYS = [
   'activityScore',
   'dateMostRecentLabs',
   'ibdInvestigations',
+  'radiologyInvestigations',
   'currentIbdMedicationsRows',
   'failedTreatments',
   'responseToTreatment',
@@ -168,6 +209,45 @@ export function buildAssessmentSavePayload(
     if (key in source) {
       payload[key] = source[key];
     }
+  }
+
+  if ('ucEndoscopicScoring' in payload) {
+    payload.ucEndoscopicScoring = serializeUcEndoscopicScoring(
+      normalizeUcEndoscopicScoring(parseUcEndoscopicScoring(payload.ucEndoscopicScoring)),
+    );
+  }
+
+  if ('sesCdScoring' in payload) {
+    payload.sesCdScoring = serializeSesCdScoring(
+      normalizeSesCdScoring(parseSesCdScoring(payload.sesCdScoring)),
+    );
+  }
+
+  if ('hbiScoring' in payload) {
+    payload.hbiScoring = serializeHarveyBradshawIndex(
+      normalizeHarveyBradshawIndex(parseHarveyBradshawIndex(payload.hbiScoring)),
+    );
+  }
+
+  if ('partialMayoScoring' in payload) {
+    payload.partialMayoScoring = serializePartialMayoScore(
+      normalizePartialMayoScore(parsePartialMayoScore(payload.partialMayoScoring)),
+    );
+  }
+
+  if ('ibdInvestigations' in payload) {
+    const legacyDate = typeof payload.dateMostRecentLabs === 'string' ? payload.dateMostRecentLabs : '';
+    const normalized = normalizeIbdInvestigations(
+      parseIbdInvestigations(payload.ibdInvestigations, legacyDate),
+    );
+    payload.ibdInvestigations = serializeIbdInvestigations(normalized);
+    payload.dateMostRecentLabs = primaryInvestigationAssessmentDate(normalized);
+  }
+
+  if ('radiologyInvestigations' in payload) {
+    payload.radiologyInvestigations = serializeRadiologyInvestigations(
+      normalizeRadiologyInvestigations(parseRadiologyInvestigations(payload.radiologyInvestigations)),
+    );
   }
 
   return { ...payload, ...overrides };

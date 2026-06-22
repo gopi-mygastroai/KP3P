@@ -9,7 +9,8 @@ import { carePlanPrimaryPatientLanguage } from '@/lib/preferredLanguagePrompt';
 import type { PatientData } from '@/lib/kp3p-prompt';
 import { CaresheetButton } from '@/components/CaresheetButton';
 import type { PatientWithUser } from '@/types/assessment-form';
-import { filledInvestigationEntries, parseIbdInvestigations } from '@/lib/ibd-investigations';
+import { filledInvestigationSets, parseIbdInvestigations } from '@/lib/ibd-investigations';
+import { formatRadiologyForPrompt } from '@/lib/radiology-investigations';
 import { getErrorMessage } from '@/lib/get-error-message';
 
 /** Full vaccine line(s) for Gemini prompt — includes dose dates when stored as structured JSON. */
@@ -72,8 +73,11 @@ function toKP3PPatient(patient: PatientWithUser): PatientData {
     impactOnQoL: patient.impactOnQoL || undefined,
     currentIbdMedicationsRows: patient.currentIbdMedicationsRows || undefined,
     ibdInvestigations: patient.ibdInvestigations || undefined,
+    radiologyInvestigations: patient.radiologyInvestigations || undefined,
     investigationsDate: patient.dateMostRecentLabs || undefined,
     sesCdScoring: patient.sesCdScoring || undefined,
+    hbiScoring: patient.hbiScoring || undefined,
+    partialMayoScoring: patient.partialMayoScoring || undefined,
     upperGiFindings: patient.upperGiFindings || undefined,
     ucEndoscopicScoring: patient.ucEndoscopicScoring || undefined,
     sesCdClinicalNotes: patient.sesCdClinicalNotes || undefined,
@@ -164,7 +168,8 @@ Diagnosis:${patient.primaryDiagnosis||''} Montreal:${patient.montrealClass||''} 
 [ACTIVITY]
 Level:${patient.currentDiseaseActivity||''} BowelFreq:${patient.stoolFrequency||''} BloodInStool:${patient.bloodInStool||''} AbdPain:${patient.abdominalPain||''} QoL:${patient.impactOnQoL||''} WeightLoss:${patient.weightLoss||''}
 [LABS]
-MostRecentLabsDate:${patient.dateMostRecentLabs||'None'} InvestigationValues:${filledInvestigationEntries(parseIbdInvestigations(patient.ibdInvestigations)).map((entry)=>`${entry.label}=${entry.value}`).join('; ')||'None'}
+MostRecentLabsDate:${patient.dateMostRecentLabs||'None'} InvestigationValues:${filledInvestigationSets(parseIbdInvestigations(patient.ibdInvestigations, patient.dateMostRecentLabs)).map((set, i)=>{const vals=set.entries.map((entry)=>`${entry.label}=${entry.value}`).join('; ')||'None';return `Set${i+1}${set.assessmentDate?`(${set.assessmentDate})`:''}:${vals}`;}).join(' || ')||'None'}
+Radiology:${formatRadiologyForPrompt(patient.radiologyInvestigations)}
 [TREATMENT]
 MedicationRows:${patient.currentIbdMedicationsRows||'[]'} Response:${patient.responseToTreatment||''} FailedTx:${patient.failedTreatments||''}
 [SCREENING]
