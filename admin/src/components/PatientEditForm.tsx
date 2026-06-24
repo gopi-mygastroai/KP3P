@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { PatientWithUser } from '@/types/assessment-form';
 import { getErrorMessage } from '@/lib/get-error-message';
 import PatientDetailsEditor from '@/components/patient-detail/PatientDetailsEditor';
+import PatientDetailsSectionNav from '@/components/patient-detail/PatientDetailsSectionNav';
 
 export default function PatientEditForm({ patient }: { patient: PatientWithUser }) {
   const router = useRouter();
@@ -63,7 +64,23 @@ export default function PatientEditForm({ patient }: { patient: PatientWithUser 
         }
         .pef-header {
           background: linear-gradient(135deg, #0891b2 0%, #a5f3fc 100%);
-          padding: 28px 40px 24px;
+          padding: 28px 40px 20px;
+        }
+        .pef-sticky-chrome {
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+        }
+        .pef-sticky-chrome .pde-section-nav-wrap {
+          padding: 0 40px 12px;
+          margin-bottom: 0;
+          background: rgba(255, 255, 255, 0.98);
+          backdrop-filter: blur(10px);
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .pef-sticky-chrome .pde-section-nav {
+          padding-top: 10px;
         }
         .pef-back-link {
           display: inline-flex;
@@ -169,19 +186,23 @@ export default function PatientEditForm({ patient }: { patient: PatientWithUser 
           box-shadow: 0 20px 50px rgba(0,0,0,0.15);
         }
         @media (max-width: 768px) {
-          .pef-header { padding: 20px 24px; }
+          .pef-header { padding: 20px 24px 16px; }
+          .pef-sticky-chrome .pde-section-nav-wrap { padding: 0 24px 12px; }
           .pef-body { padding: 20px 16px 100px; }
           .pef-action-bar { padding: 12px 16px; flex-wrap: wrap; }
         }
       `}</style>
 
       <div className="pef-root">
-        <div className="pef-header">
-          <Link href={`/admin/patient/${patient.id}`} className="pef-back-link">
-            ← Back to patient details
-          </Link>
-          <h1 className="pef-title">Editing: {patient.name}</h1>
-          <p className="pef-subtitle">Same fields as the assessment wizard — legacy treatment fields removed.</p>
+        <div className="pef-sticky-chrome">
+          <div className="pef-header">
+            <Link href={`/admin/patient/${patient.id}`} className="pef-back-link">
+              ← Back to patient details
+            </Link>
+            <h1 className="pef-title">Editing: {patient.name}</h1>
+            <p className="pef-subtitle">Same fields as the assessment wizard — legacy treatment fields removed.</p>
+          </div>
+          <PatientDetailsSectionNav />
         </div>
 
         <div className="pef-body">
@@ -191,6 +212,7 @@ export default function PatientEditForm({ patient }: { patient: PatientWithUser 
           <PatientDetailsEditor
             patient={patient}
             chromeless
+            showSectionNav={false}
             onSaveReady={handleSaveReady}
             onSaved={handleSaved}
           />

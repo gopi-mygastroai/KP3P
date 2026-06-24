@@ -17,6 +17,12 @@ import {
   type HbiPicklistOption,
 } from '@/lib/harvey-bradshaw-index';
 import { isFutureIsoDate, todayIsoDate } from '@/lib/iso-date';
+import {
+  fieldBorderColor,
+  FIELD_ERROR_LABEL,
+  fieldGroupErrorStyle,
+  useAssessmentFieldError,
+} from './assessment-field-errors';
 
 const inter = "'Inter', sans-serif";
 
@@ -133,6 +139,8 @@ export default function HarveyBradshawIndexForm({ data, updateData }: Props) {
   );
   const total = hbiTotal(hbi);
   const interpretation = hbiInterpretation(total);
+  const hasDateError = useAssessmentFieldError('hbiScoring.assessmentDate');
+  const [dateFocused, setDateFocused] = React.useState(false);
 
   const updateHbi = (patch: Partial<HarveyBradshawIndexData>) => {
     const next = { ...hbi, ...patch };
@@ -159,23 +167,31 @@ export default function HarveyBradshawIndexForm({ data, updateData }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180, ...fieldGroupErrorStyle(hasDateError) }}>
           <label style={{
             fontSize: 11,
             fontWeight: 700,
             letterSpacing: '0.07em',
             textTransform: 'uppercase',
-            color: '#475569',
+            color: hasDateError ? FIELD_ERROR_LABEL : '#475569',
             fontFamily: inter,
           }}>
             Date of Assessment
           </label>
           <input
             type="date"
-            style={{ ...numberInputStyle, width: 180, textAlign: 'left' }}
+            style={{
+              ...numberInputStyle,
+              width: 180,
+              textAlign: 'left',
+              borderColor: fieldBorderColor(hasDateError, dateFocused),
+              background: hasDateError ? '#fef2f2' : '#ffffff',
+            }}
             value={hbi.assessmentDate ? String(hbi.assessmentDate).substring(0, 10) : todayIsoDate()}
             max={todayIsoDate()}
             onChange={(e) => setAssessmentDate(e.target.value)}
+            onFocus={() => setDateFocused(true)}
+            onBlur={() => setDateFocused(false)}
           />
         </div>
       </div>

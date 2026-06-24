@@ -1,5 +1,8 @@
 import React from 'react';
-import type { AssessmentFormState, AssessmentUpdateFn } from '@/types/assessment-form';
+import {
+  applyNoneExclusiveToggle,
+  sanitizeNoneExclusiveSelection,
+} from '@/lib/none-exclusive-multi-select';
 import { getErrorMessage } from '@/lib/get-error-message';
 import {
   composeMontrealClass,
@@ -28,6 +31,13 @@ import IbdInvestigationsForm from './IbdInvestigationsForm';
 import RadiologyInvestigationsForm from './RadiologyInvestigationsForm';
 import CurrentIbdMedicationsTable from './CurrentIbdMedicationsTable';
 import InfectionScreeningForm from './InfectionScreeningForm';
+import type { AssessmentFormState, AssessmentUpdateFn } from '@/types/assessment-form';
+import {
+  fieldBorderColor,
+  fieldGroupErrorStyle,
+  FIELD_ERROR_LABEL,
+  useAssessmentFieldError,
+} from './assessment-field-errors';
 
 const inter = "'Inter', sans-serif";
 
@@ -45,22 +55,27 @@ const FieldBox = ({
   label,
   children,
   required = false,
+  fieldKey,
 }: {
   label: string;
   children: React.ReactNode;
   required?: boolean;
-}) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-    <label style={{
-      fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
-      textTransform: 'uppercase', color: '#475569', fontFamily: inter,
-    }}>
-      {label}
-      {required && <span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>}
-    </label>
-    {children}
-  </div>
-);
+  fieldKey?: string;
+}) => {
+  const hasError = useAssessmentFieldError(fieldKey ?? '');
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, ...fieldGroupErrorStyle(hasError) }}>
+      <label style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
+        textTransform: 'uppercase', color: hasError ? FIELD_ERROR_LABEL : '#475569', fontFamily: inter,
+      }}>
+        {label}
+        {required && <span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>}
+      </label>
+      {children}
+    </div>
+  );
+};
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -78,6 +93,52 @@ const inputStyle: React.CSSProperties = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────
+function TextInputField({
+  name,
+  label,
+  type = 'text',
+  data,
+  updateData,
+  required = false,
+}: {
+  name: string;
+  label: string;
+  type?: string;
+  data: AssessmentFormState;
+  updateData: AssessmentUpdateFn;
+  required?: boolean;
+}) {
+  const hasError = useAssessmentFieldError(name);
+  const [focused, setFocused] = React.useState(false);
+  return (
+    <FieldBox label={label} required={required} fieldKey={name}>
+      <input
+        type={type}
+        style={{
+          ...inputStyle,
+          borderColor: fieldBorderColor(hasError, focused),
+          background: hasError ? '#fef2f2' : '#ffffff',
+        }}
+        required={required}
+        value={(() => {
+          const v = formValue(data, name);
+          return v === '' || v == null ? '' : String(v);
+        })()}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (type === 'number') {
+            updateData({ [name]: raw === '' ? '' : Number(raw) });
+          } else {
+            updateData({ [name]: raw });
+          }
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+    </FieldBox>
+  );
+}
+
 export const textInput = (
   name: string,
   label: string,
@@ -86,28 +147,66 @@ export const textInput = (
   updateData: AssessmentUpdateFn,
   required: boolean = false,
 ) => (
-  <FieldBox key={name} label={label} required={required}>
-    <input
-      type={type}
-      style={inputStyle}
-      required={required}
-      value={(() => {
-        const v = formValue(data, name);
-        return v === '' || v == null ? '' : String(v);
-      })()}
-      onChange={(e) => {
-        const raw = e.target.value;
-        if (type === 'number') {
-          updateData({ [name]: raw === '' ? '' : Number(raw) });
-        } else {
-          updateData({ [name]: raw });
-        }
-      }}
-      onFocus={(e) => (e.target.style.borderColor = '#0891b2')}
-      onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
-    />
-  </FieldBox>
+  <TextInputField
+    key={name}
+    name={name}
+    label={label}
+    type={type}
+    data={data}
+    updateData={updateData}
+    required={required}
+  />
 );
+
+function TextAreaField({
+  name,
+  label,
+  data,
+  updateData,
+  required = false,
+  helpText,
+  helpExample,
+}: {
+  name: string;
+  label: string;
+  data: AssessmentFormState;
+  updateData: AssessmentUpdateFn;
+  required?: boolean;
+  helpText?: string;
+  helpExample?: string;
+}) {
+  const hasError = useAssessmentFieldError(name);
+  const [focused, setFocused] = React.useState(false);
+  return (
+    <FieldBox label={label} required={required} fieldKey={name}>
+      <textarea
+        style={{
+          ...inputStyle,
+          resize: 'vertical',
+          minHeight: 80,
+          borderColor: fieldBorderColor(hasError, focused),
+          background: hasError ? '#fef2f2' : '#ffffff',
+        }}
+        rows={3}
+        required={required}
+        value={String(formValue(data, name) ?? '')}
+        onChange={(e) => updateData({ [name]: e.target.value })}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+      {helpText && (
+        <p style={{ fontSize: 11, color: '#64748b', margin: '8px 0 0', fontFamily: inter, lineHeight: 1.45 }}>
+          {helpText}
+        </p>
+      )}
+      {helpExample && (
+        <p style={{ fontSize: 11, color: '#64748b', margin: '6px 0 0', fontFamily: inter, lineHeight: 1.45 }}>
+          {helpExample}
+        </p>
+      )}
+    </FieldBox>
+  );
+}
 
 export const textArea = (
   name: string,
@@ -118,28 +217,73 @@ export const textArea = (
   helpText?: string,
   helpExample?: string,
 ) => (
-  <FieldBox key={name} label={label} required={required}>
-    <textarea
-      style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }}
-      rows={3}
-      required={required}
-      value={String(formValue(data, name) ?? '')}
-      onChange={(e) => updateData({ [name]: e.target.value })}
-      onFocus={(e) => (e.target.style.borderColor = '#0891b2')}
-      onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
-    />
-    {helpText && (
-      <p style={{ fontSize: 11, color: '#64748b', margin: '8px 0 0', fontFamily: inter, lineHeight: 1.45 }}>
-        {helpText}
-      </p>
-    )}
-    {helpExample && (
-      <p style={{ fontSize: 11, color: '#64748b', margin: '6px 0 0', fontFamily: inter, lineHeight: 1.45 }}>
-        {helpExample}
-      </p>
-    )}
-  </FieldBox>
+  <TextAreaField
+    key={name}
+    name={name}
+    label={label}
+    data={data}
+    updateData={updateData}
+    required={required}
+    helpText={helpText}
+    helpExample={helpExample}
+  />
 );
+
+function RadioGroupField({
+  name,
+  label,
+  options,
+  data,
+  updateData,
+  required = false,
+}: {
+  name: string;
+  label: string;
+  options: string[];
+  data: AssessmentFormState;
+  updateData: AssessmentUpdateFn;
+  required?: boolean;
+}) {
+  const hasError = useAssessmentFieldError(name);
+  return (
+    <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: 8, ...fieldGroupErrorStyle(hasError) }}>
+      <label style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
+        textTransform: 'uppercase', color: hasError ? FIELD_ERROR_LABEL : '#475569', fontFamily: inter,
+      }}>
+        {label}
+        {required && <span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>}
+      </label>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {options.map((opt, i) => {
+          const isSelected = formValue(data, name) === opt;
+          return (
+            <label key={opt} style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
+              border: `1px solid ${isSelected ? '#0891b2' : hasError ? '#fca5a5' : '#cbd5e1'}`,
+              background: isSelected ? '#ecfeff' : hasError ? '#fff1f2' : '#ffffff',
+              fontFamily: inter, fontSize: 13, fontWeight: 600,
+              color: isSelected ? '#0e7490' : '#374151',
+              transition: 'all 0.15s',
+            }}>
+              <input
+                type="radio"
+                name={name}
+                value={opt}
+                checked={isSelected}
+                required={required && i === 0}
+                onChange={(e) => updateData({ [name]: e.target.value })}
+                style={{ accentColor: '#0891b2', width: 14, height: 14 }}
+              />
+              {opt}
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export const radioGroup = (
   name: string,
@@ -149,67 +293,46 @@ export const radioGroup = (
   updateData: AssessmentUpdateFn,
   required: boolean = false,
 ) => (
-  <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-    <label style={{
-      fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
-      textTransform: 'uppercase', color: '#475569', fontFamily: inter,
-    }}>
-      {label}
-      {required && <span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>}
-    </label>
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-      {options.map((opt, i) => {
-        const isSelected = formValue(data, name) === opt;
-        return (
-          <label key={opt} style={{
-            display: 'flex', alignItems: 'center', gap: 7,
-            padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
-            border: `1px solid ${isSelected ? '#0891b2' : '#cbd5e1'}`,
-            background: isSelected ? '#ecfeff' : '#ffffff',
-            fontFamily: inter, fontSize: 13, fontWeight: 600,
-            color: isSelected ? '#0e7490' : '#374151',
-            transition: 'all 0.15s',
-          }}>
-            <input
-              type="radio"
-              name={name}
-              value={opt}
-              checked={isSelected}
-              required={required && i === 0}
-              onChange={(e) => updateData({ [name]: e.target.value })}
-              style={{ accentColor: '#0891b2', width: 14, height: 14 }}
-            />
-            {opt}
-          </label>
-        );
-      })}
-    </div>
-  </div>
+  <RadioGroupField
+    name={name}
+    label={label}
+    options={options}
+    data={data}
+    updateData={updateData}
+    required={required}
+  />
 );
 
-export const checkboxGroup = (
-  name: string,
-  label: string,
-  options: string[],
-  data: AssessmentFormState,
-  updateData: AssessmentUpdateFn,
-  required: boolean = false,
-) => {
+function CheckboxGroupField({
+  name,
+  label,
+  options,
+  data,
+  updateData,
+  required = false,
+}: {
+  name: string;
+  label: string;
+  options: string[];
+  data: AssessmentFormState;
+  updateData: AssessmentUpdateFn;
+  required?: boolean;
+}) {
+  const hasError = useAssessmentFieldError(name);
   const raw = formValue(data, name);
-  const selected = Array.isArray(raw) ? (raw as string[]) : [];
+  const selected = sanitizeNoneExclusiveSelection(
+    Array.isArray(raw) ? (raw as string[]) : [],
+  );
+  const hasNoneOption = options.includes('None');
   const handleToggle = (opt: string) => {
-    if (selected.includes(opt)) {
-      updateData({ [name]: selected.filter((item: string) => item !== opt) });
-    } else {
-      updateData({ [name]: [...selected, opt] });
-    }
+    updateData({ [name]: applyNoneExclusiveToggle(selected, opt, hasNoneOption) });
   };
 
   return (
-    <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: 8, ...fieldGroupErrorStyle(hasError) }}>
       <label style={{
         fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
-        textTransform: 'uppercase', color: '#475569', fontFamily: inter,
+        textTransform: 'uppercase', color: hasError ? FIELD_ERROR_LABEL : '#475569', fontFamily: inter,
       }}>
         {label}
         {required && <span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>}
@@ -221,8 +344,8 @@ export const checkboxGroup = (
             <label key={opt} style={{
               display: 'flex', alignItems: 'center', gap: 7,
               padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
-              border: `1px solid ${isSelected ? '#0891b2' : '#cbd5e1'}`,
-              background: isSelected ? '#ecfeff' : '#ffffff',
+              border: `1px solid ${isSelected ? '#0891b2' : hasError ? '#fca5a5' : '#cbd5e1'}`,
+              background: isSelected ? '#ecfeff' : hasError ? '#fff1f2' : '#ffffff',
               fontFamily: inter, fontSize: 13, fontWeight: 600,
               color: isSelected ? '#0e7490' : '#374151',
               transition: 'all 0.15s',
@@ -240,7 +363,25 @@ export const checkboxGroup = (
       </div>
     </div>
   );
-};
+}
+
+export const checkboxGroup = (
+  name: string,
+  label: string,
+  options: string[],
+  data: AssessmentFormState,
+  updateData: AssessmentUpdateFn,
+  required: boolean = false,
+) => (
+  <CheckboxGroupField
+    name={name}
+    label={label}
+    options={options}
+    data={data}
+    updateData={updateData}
+    required={required}
+  />
+);
 
 // ── Grid wrapper ──────────────────────────────────────────────────────
 const Grid2 = ({ children }: { children: React.ReactNode }) => (
@@ -663,6 +804,59 @@ const DISEASE_BEHAVIORS = [
 
 const PERIANAL_OPTIONS = ['P (Yes)', 'No'] as const;
 
+function ScoringDateField({
+  fieldKey,
+  label,
+  value,
+  max,
+  onChange,
+}: {
+  fieldKey: string;
+  label: string;
+  value: string;
+  max: string;
+  onChange: (date: string) => void;
+}) {
+  const hasError = useAssessmentFieldError(fieldKey);
+  const [focused, setFocused] = React.useState(false);
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 6,
+      minWidth: 180,
+      ...fieldGroupErrorStyle(hasError),
+    }}>
+      <label style={{
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.07em',
+        textTransform: 'uppercase',
+        color: hasError ? FIELD_ERROR_LABEL : '#475569',
+        fontFamily: inter,
+      }}>
+        {label}
+      </label>
+      <input
+        type="date"
+        style={{
+          ...inputStyle,
+          width: 180,
+          padding: '8px 12px',
+          fontSize: 13,
+          borderColor: fieldBorderColor(hasError, focused),
+          background: hasError ? '#fef2f2' : '#ffffff',
+        }}
+        value={value}
+        max={max}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+    </div>
+  );
+}
+
 export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
   const diagnosis = data.primaryDiagnosis;
 
@@ -775,27 +969,13 @@ export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
         label="UC Endoscopic Scoring Tool"
         description="Ulcerative Colitis  ·  Mayo Endoscopic Score  +  UCEIS  ·  Auto-calculated"
         headerAside={(
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180 }}>
-            <label style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.07em',
-              textTransform: 'uppercase',
-              color: '#475569',
-              fontFamily: inter,
-            }}>
-              Scoring Date
-            </label>
-            <input
-              type="date"
-              style={{ ...inputStyle, width: 180, padding: '8px 12px', fontSize: 13 }}
-              value={ucEndoscopicScoring.scoringDate ? String(ucEndoscopicScoring.scoringDate).substring(0, 10) : todayIsoDate()}
-              max={todayIsoDate()}
-              onChange={(e) => updateUcScoringDate(e.target.value)}
-              onFocus={(e) => { e.target.style.borderColor = '#0891b2'; }}
-              onBlur={(e) => { e.target.style.borderColor = '#cbd5e1'; }}
-            />
-          </div>
+          <ScoringDateField
+            fieldKey="ucEndoscopicScoring.scoringDate"
+            label="Scoring Date"
+            value={ucEndoscopicScoring.scoringDate ? String(ucEndoscopicScoring.scoringDate).substring(0, 10) : todayIsoDate()}
+            max={todayIsoDate()}
+            onChange={updateUcScoringDate}
+          />
         )}
       >
         <UcEndoscopicScoringTool data={data} updateData={updateData} />
@@ -806,27 +986,13 @@ export const AdminStep4 = ({ data, updateData }: StepComponentProps) => {
         label="SES-CD Scoring"
         description="Score each variable for each segment using the dropdown"
         headerAside={(
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180 }}>
-            <label style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.07em',
-              textTransform: 'uppercase',
-              color: '#475569',
-              fontFamily: inter,
-            }}>
-              Scoring Date
-            </label>
-            <input
-              type="date"
-              style={{ ...inputStyle, width: 180, padding: '8px 12px', fontSize: 13 }}
-              value={sesCdScoring.scoringDate ? String(sesCdScoring.scoringDate).substring(0, 10) : todayIsoDate()}
-              max={todayIsoDate()}
-              onChange={(e) => updateSesCdScoringDate(e.target.value)}
-              onFocus={(e) => { e.target.style.borderColor = '#0891b2'; }}
-              onBlur={(e) => { e.target.style.borderColor = '#cbd5e1'; }}
-            />
-          </div>
+          <ScoringDateField
+            fieldKey="sesCdScoring.scoringDate"
+            label="Scoring Date"
+            value={sesCdScoring.scoringDate ? String(sesCdScoring.scoringDate).substring(0, 10) : todayIsoDate()}
+            max={todayIsoDate()}
+            onChange={updateSesCdScoringDate}
+          />
         )}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

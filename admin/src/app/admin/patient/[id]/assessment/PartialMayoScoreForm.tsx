@@ -17,6 +17,12 @@ import {
   type PMayoPicklistOption,
 } from '@/lib/partial-mayo-score';
 import { isFutureIsoDate, todayIsoDate } from '@/lib/iso-date';
+import {
+  fieldBorderColor,
+  FIELD_ERROR_LABEL,
+  fieldGroupErrorStyle,
+  useAssessmentFieldError,
+} from './assessment-field-errors';
 
 const inter = "'Inter', sans-serif";
 
@@ -132,6 +138,8 @@ export default function PartialMayoScoreForm({ data, updateData }: Props) {
   );
   const total = partialMayoTotal(pMayo);
   const interpretation = partialMayoInterpretation(total);
+  const hasDateError = useAssessmentFieldError('partialMayoScoring.assessmentDate');
+  const [dateFocused, setDateFocused] = React.useState(false);
 
   const updatePMayo = (patch: Partial<PartialMayoScoreData>) => {
     const next = { ...pMayo, ...patch };
@@ -152,23 +160,30 @@ export default function PartialMayoScoreForm({ data, updateData }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180, ...fieldGroupErrorStyle(hasDateError) }}>
           <label style={{
             fontSize: 11,
             fontWeight: 700,
             letterSpacing: '0.07em',
             textTransform: 'uppercase',
-            color: '#475569',
+            color: hasDateError ? FIELD_ERROR_LABEL : '#475569',
             fontFamily: inter,
           }}>
             Date of Assessment
           </label>
           <input
             type="date"
-            style={{ ...dateInputStyle, width: 180 }}
+            style={{
+              ...dateInputStyle,
+              width: 180,
+              borderColor: fieldBorderColor(hasDateError, dateFocused),
+              background: hasDateError ? '#fef2f2' : '#ffffff',
+            }}
             value={pMayo.assessmentDate ? String(pMayo.assessmentDate).substring(0, 10) : todayIsoDate()}
             max={todayIsoDate()}
             onChange={(e) => setAssessmentDate(e.target.value)}
+            onFocus={() => setDateFocused(true)}
+            onBlur={() => setDateFocused(false)}
           />
         </div>
       </div>
@@ -256,9 +271,6 @@ export default function PartialMayoScoreForm({ data, updateData }: Props) {
             </span>
             <span style={{ fontSize: 12, color: '#64748b', fontFamily: inter }}>
               {interpretation.clinicalMeaning}
-            </span>
-            <span style={{ fontSize: 12, color: '#475569', fontFamily: inter, fontWeight: 600 }}>
-              Action: {interpretation.action}
             </span>
           </div>
         </div>

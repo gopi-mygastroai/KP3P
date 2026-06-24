@@ -10,36 +10,18 @@ import {
 } from './AdminAssessmentSteps';
 import type { PatientWithUser, AssessmentFormState, AssessmentUpdateFn } from '@/types/assessment-form';
 import { getErrorMessage } from '@/lib/get-error-message';
-import { montrealValidationMissing } from '@/lib/montreal-classification';
-import { parseIbdInvestigations } from '@/lib/ibd-investigations';
-import { parseRadiologyInvestigations } from '@/lib/radiology-investigations';
-import {
-  isFutureIsoDate,
-  normalizeUcEndoscopicScoring,
-  parseUcEndoscopicScoring,
-} from '@/lib/uc-endoscopic-scoring';
-import {
-  normalizeHarveyBradshawIndex,
-  parseHarveyBradshawIndex,
-} from '@/lib/harvey-bradshaw-index';
-import {
-  normalizePartialMayoScore,
-  parsePartialMayoScore,
-} from '@/lib/partial-mayo-score';
-import {
-  normalizeSesCdScoring,
-  parseSesCdScoring,
-} from '@/lib/ses-cd-scoring';
 import { performLogout } from '@/lib/logout-client';
 import {
-  assessmentField,
   buildAssessmentFormState,
   buildAssessmentSavePayload,
 } from '@/lib/build-assessment-form-state';
 import {
-  parseInfectionScreening,
-  validateInfectionScreeningSets,
-} from '@/lib/infection-screening';
+  formatAssessmentFieldErrors,
+  validateAssessmentStepFields,
+} from '@/lib/assessment-step-validation';
+import {
+  AssessmentFieldErrorsProvider,
+} from './assessment-field-errors';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -104,6 +86,7 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Set<string>>(() => new Set());
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const saveInFlightRef = useRef(false);
   const mainScrollRef = useRef<HTMLDivElement>(null);
@@ -149,228 +132,45 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
 
   const updateData: AssessmentUpdateFn = (fields) => {
     setFormData((prev) => ({ ...prev, ...fields }) as AssessmentFormState);
-  };
-
-  const validateAssessmentStep = (stepNum: number, data: AssessmentFormState): string | null => {
-    const isNonEmpty = (v: unknown) => String(v ?? '').trim() !== '';
-
-    if (stepNum === 1) {
-      const requiredFields: { key: string; label: string }[] = [
-        { key: 'name', label: 'Name' },
-        { key: 'email', label: 'Email' },
-        { key: 'mrn', label: 'ID / MRN' },
-        { key: 'contactPhone', label: 'Contact Phone' },
-        { key: 'placeOfLiving', label: 'Place of Living' },
-        { key: 'referredBy', label: 'Referred By' },
-        { key: 'dateOfBirth', label: 'Date of Birth' },
-      ];
-      const missing = requiredFields
-        .filter(({ key }) => !isNonEmpty(assessmentField(data, key)))
-        .map(({ label }) => label);
-
-      if (!isNonEmpty(data?.sex)) missing.push('Sex');
-
-      if (!isNonEmpty(data?.smokingStatus)) missing.push('Smoking Status');
-      const needsSmokingDetails =
-        data?.smokingStatus === 'Current smoker' ||
-        data?.smokingStatus === 'Ex smoker' ||
-        data?.smokingStatus === 'Current' ||
-        data?.smokingStatus === 'Former';
-      if (needsSmokingDetails && !isNonEmpty(data?.smokingDetails)) {
-        missing.push('Smoking amount');
-      }
-
-      const caRaw = assessmentField(data, 'currentAge');
-      const caNum = typeof caRaw === 'number' ? caRaw : typeof caRaw === 'string' ? Number(caRaw) : NaN;
-      if (!Number.isFinite(caNum)) missing.push('Current Age');
-
-      const email = String(data?.email ?? '').trim();
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return 'Please enter a valid email address.';
-      }
-
-      if (missing.length > 0) {
-        return missing.join(', ');
-      }
-    }
-
-    if (stepNum === 2) {
-      const missing: string[] = [];
-      if (!isNonEmpty(data?.primaryDiagnosis)) missing.push('Primary Diagnosis');
-      const adRaw = assessmentField(data, 'ageAtDiagnosis');
-      const adNum = typeof adRaw === 'number' ? adRaw : typeof adRaw === 'string' ? Number(adRaw) : NaN;
-      if (!Number.isFinite(adNum)) missing.push('Age at Diagnosis');
-      if (!isNonEmpty(data?.diseaseDuration)) missing.push('Disease Duration');
-      missing.push(
-        ...montrealValidationMissing(data?.primaryDiagnosis, {
-          montrealAgeAtDiagnosis: data?.montrealAgeAtDiagnosis,
-          ucExtent: data?.ucExtent,
-          diseaseLocation: data?.diseaseLocation,
-          diseaseBehavior: data?.diseaseBehavior,
-          perianalDisease: data?.perianalDisease,
-        }),
-      );
-
-      let surgeries: unknown[] = [];
-      const raw = data?.previousSurgeries;
-      if (Array.isArray(raw)) surgeries = raw;
-      else if (typeof raw === 'string') {
-        try {
-          const p = JSON.parse(raw);
-          if (Array.isArray(p)) surgeries = p;
-        } catch {
-          /* ignore */
-        }
-      }
-      if (surgeries.length === 0) missing.push('Previous IBD Surgeries');
-
-      if (data?.primaryDiagnosis === 'Ulcerative Colitis') {
-        const ucScoring = normalizeUcEndoscopicScoring(parseUcEndoscopicScoring(data.ucEndoscopicScoring));
-        if (isFutureIsoDate(ucScoring.scoringDate ?? '')) {
-          return 'UC Endoscopic Scoring date cannot be in the future';
-        }
-        const pMayo = normalizePartialMayoScore(parsePartialMayoScore(data.partialMayoScoring));
-        if (isFutureIsoDate(pMayo.assessmentDate ?? '')) {
-          return 'Partial Mayo Score assessment date cannot be in the future';
-        }
-      }
-
-      if (data?.primaryDiagnosis === "Crohn's Disease") {
-        const sesScoring = normalizeSesCdScoring(parseSesCdScoring(data.sesCdScoring));
-        if (isFutureIsoDate(sesScoring.scoringDate ?? '')) {
-          return 'SES-CD Scoring date cannot be in the future';
-        }
-        const hbi = normalizeHarveyBradshawIndex(parseHarveyBradshawIndex(data.hbiScoring));
-        if (isFutureIsoDate(hbi.assessmentDate ?? '')) {
-          return 'Harvey-Bradshaw Index assessment date cannot be in the future';
-        }
-      }
-
-      if (missing.length > 0) {
-        return missing.join(', ');
-      }
-    }
-
-    if (stepNum === 3) {
-      const requiredFields = [
-        { key: 'currentDiseaseActivity', label: 'Current Disease Activity Level' },
-        { key: 'stoolFrequency', label: 'Frequency of Stools (per day)' },
-      ];
-      const missing = requiredFields
-        .filter(({ key }) => !String(assessmentField(data, key) ?? '').trim())
-        .map(({ label }) => label);
-
-      if (missing.length > 0) {
-        return missing.join(', ');
-      }
-    }
-
-    if (stepNum === 4) {
-      const inv = parseIbdInvestigations(data.ibdInvestigations, data.dateMostRecentLabs);
-      if (inv.sets.length === 0) {
-        return 'At least one Laboratory & Investigations section is required';
-      }
-      const missingDates = inv.sets
-        .map((set, i) => (!String(set.assessmentDate ?? '').trim() ? `Date of Assessment (set ${i + 1})` : null))
-        .filter(Boolean);
-      if (missingDates.length > 0) {
-        return missingDates.join(', ');
-      }
-    }
-
-    if (stepNum === 5) {
-      const radiology = parseRadiologyInvestigations(data.radiologyInvestigations);
-      if (radiology.sets.length === 0) {
-        return 'At least one Radiology Investigations section is required';
-      }
-      const missingDates = radiology.sets
-        .map((set, i) => (!String(set.assessmentDate ?? '').trim() ? `Date of Assessment (set ${i + 1})` : null))
-        .filter(Boolean);
-      if (missingDates.length > 0) {
-        return missingDates.join(', ');
-      }
-    }
-
-    if (stepNum === 6) {
-      if (!String(assessmentField(data, 'responseToTreatment') ?? '').trim()) {
-        return 'Response to Current Treatment* (Based on HBI or Partial Mayo scores)';
-      }
-    }
-
-    if (stepNum === 8) {
-      const missing: string[] = [];
-      const screening = parseInfectionScreening(
-        (data as Record<string, unknown>).infectionScreening,
-      );
-
-      for (const set of screening.sets) {
-        if (set.screeningDate.trim() && isFutureIsoDate(set.screeningDate)) {
-          return 'Screening date cannot be in the future';
-        }
-      }
-
-      missing.push(...validateInfectionScreeningSets(screening));
-
-      let comorb: unknown[] = [];
-      const comorbRaw = data?.comorbidities;
-      if (Array.isArray(comorbRaw)) comorb = comorbRaw;
-      else if (typeof comorbRaw === 'string') {
-        try {
-          const p = JSON.parse(comorbRaw);
-          if (Array.isArray(p)) comorb = p;
-        } catch {
-          /* ignore */
-        }
-      }
-      if (comorb.length === 0) missing.push('Comorbidities');
-
-      let eim: unknown[] = [];
-      const eimRaw = data?.extraintestinalManif;
-      if (Array.isArray(eimRaw)) eim = eimRaw;
-      else if (typeof eimRaw === 'string') {
-        const trimmed = eimRaw.trim();
-        if (trimmed.startsWith('[')) {
-          try {
-            const p = JSON.parse(trimmed);
-            if (Array.isArray(p)) eim = p;
-          } catch {
-            /* ignore */
+    setFieldErrors((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set(prev);
+      for (const key of Object.keys(fields)) {
+        for (const errKey of prev) {
+          if (errKey === key || errKey.startsWith(`${key}.`)) {
+            next.delete(errKey);
           }
-        } else if (trimmed) {
-          eim = [trimmed];
         }
       }
-      if (eim.length === 0) missing.push('Extraintestinal Manifestations');
-      if (!isNonEmpty(data?.pregnancyPlanning)) missing.push('Pregnancy / Family Planning Status');
-
-      if (missing.length > 0) {
-        return missing.join(', ');
-      }
-    }
-
-    return null;
+      return next;
+    });
   };
 
-  const validateCurrentStep = () => {
-    const stepError = validateAssessmentStep(currentStep, formData);
-    if (stepError) {
-      setError(`Please fill all mandatory fields before continuing: ${stepError}`);
-      return false;
+  const applyStepValidation = (stepNum: number): boolean => {
+    const { errors } = validateAssessmentStepFields(stepNum, formData);
+    if (errors.length === 0) {
+      setFieldErrors(new Set());
+      setError('');
+      return true;
     }
-    setError('');
-    return true;
+    setFieldErrors(new Set(errors.map((entry) => entry.fieldKey)));
+    setError(`Please fill all mandatory fields before continuing: ${formatAssessmentFieldErrors(errors)}`);
+    return false;
   };
+
+  const validateCurrentStep = () => applyStepValidation(currentStep);
 
   const validateAllSteps = (): string | null => {
-    const stepErrors: string[] = [];
     for (let stepNum = 1; stepNum <= totalSteps; stepNum++) {
-      const stepError = validateAssessmentStep(stepNum, formData);
-      if (stepError) {
-        stepErrors.push(`Step ${stepNum} (${stepLabels[stepNum - 1]}): ${stepError}`);
+      const { errors } = validateAssessmentStepFields(stepNum, formData);
+      if (errors.length > 0) {
+        setFieldErrors(new Set(errors.map((entry) => entry.fieldKey)));
+        setCurrentStep(stepNum);
+        return `Please fix mandatory fields before completing the assessment — Step ${stepNum} (${stepLabels[stepNum - 1]}): ${formatAssessmentFieldErrors(errors)}`;
       }
     }
-    if (stepErrors.length === 0) return null;
-    return `Please fix mandatory fields before completing the assessment — ${stepErrors.join('; ')}`;
+    setFieldErrors(new Set());
+    return null;
   };
 
   const isStepReachable = (stepNum: number) =>
@@ -379,6 +179,7 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
   const jumpToStep = (target: number) => {
     if (target === currentStep || !isStepReachable(target)) return;
     setError('');
+    setFieldErrors(new Set());
     setCurrentStep(target);
   };
 
@@ -432,6 +233,7 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
     if (!validateCurrentStep()) return;
     setIsSavingStep(true);
     setError('');
+    setFieldErrors(new Set());
     const ok = await persistProgress({ assessmentCurrentStep: currentStep + 1 });
     setIsSavingStep(false);
     if (!ok) return;
@@ -440,7 +242,11 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
   };
 
   const handleBack = () => {
-    if (currentStep > 1) setCurrentStep((prev) => prev - 1);
+    if (currentStep > 1) {
+      setError('');
+      setFieldErrors(new Set());
+      setCurrentStep((prev) => prev - 1);
+    }
   };
 
   /** Persist draft and leave — no per-step validation (partial save). */
@@ -683,26 +489,28 @@ export default function AssessmentWizard({ patient }: { patient: PatientWithUser
           </div>
 
           {/* Form content */}
-          <div
-            style={{
-              flex: 1,
-              background: '#ffffff',
-              padding: currentStep === 4 || currentStep === 5 ? '12px 16px' : '24px',
-              borderRadius: 12,
-              border: '0.5px solid #e2e8f0',
-              marginBottom: currentStep === 4 || currentStep === 5 ? 12 : 20,
-              fontFamily: "'Inter', sans-serif",
-            }}
-          >
-            {currentStep === 1 && <AdminStep1 data={formData} updateData={updateData} />}
-            {currentStep === 2 && <AdminStep4 data={formData} updateData={updateData} />}
-            {currentStep === 3 && <AdminStep5 data={formData} updateData={updateData} />}
-            {currentStep === 4 && <AdminStep6 data={formData} updateData={updateData} />}
-            {currentStep === 5 && <AdminStep7 data={formData} updateData={updateData} />}
-            {currentStep === 6 && <AdminStep8 data={formData} updateData={updateData} />}
-            {currentStep === 7 && <AdminStep2 data={formData} updateData={updateData} />}
-            {currentStep === 8 && <AdminStep9 data={formData} updateData={updateData} />}
-          </div>
+          <AssessmentFieldErrorsProvider fieldErrors={fieldErrors}>
+            <div
+              style={{
+                flex: 1,
+                background: '#ffffff',
+                padding: currentStep === 4 || currentStep === 5 ? '12px 16px' : '24px',
+                borderRadius: 12,
+                border: '0.5px solid #e2e8f0',
+                marginBottom: currentStep === 4 || currentStep === 5 ? 12 : 20,
+                fontFamily: "'Inter', sans-serif",
+              }}
+            >
+              {currentStep === 1 && <AdminStep1 data={formData} updateData={updateData} />}
+              {currentStep === 2 && <AdminStep4 data={formData} updateData={updateData} />}
+              {currentStep === 3 && <AdminStep5 data={formData} updateData={updateData} />}
+              {currentStep === 4 && <AdminStep6 data={formData} updateData={updateData} />}
+              {currentStep === 5 && <AdminStep7 data={formData} updateData={updateData} />}
+              {currentStep === 6 && <AdminStep8 data={formData} updateData={updateData} />}
+              {currentStep === 7 && <AdminStep2 data={formData} updateData={updateData} />}
+              {currentStep === 8 && <AdminStep9 data={formData} updateData={updateData} />}
+            </div>
+          </AssessmentFieldErrorsProvider>
 
           {error && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 12, fontFamily: "'Inter', sans-serif" }}>{error}</p>}
 

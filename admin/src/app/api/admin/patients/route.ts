@@ -31,7 +31,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const newPatient = await prisma.patient.create({
-      data: patientCreateDataFromBody(body),
+      data: {
+        ...patientCreateDataFromBody(body),
+        // Basic info (step 1) was completed on the add-patient form — start assessment at step 2.
+        assessmentCurrentStep: 2,
+      },
     });
 
     return NextResponse.json({ success: true, patientId: newPatient.id });

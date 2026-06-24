@@ -13,6 +13,12 @@ import {
   type IbdInvestigationSet,
   type IbdInvestigationsData,
 } from '@/lib/ibd-investigations';
+import {
+  fieldBorderColor,
+  FIELD_ERROR_LABEL,
+  ibdInvestigationFieldKey,
+  useAssessmentFieldError,
+} from './assessment-field-errors';
 
 const inter = "'Inter', sans-serif";
 
@@ -107,6 +113,9 @@ function InvestigationSetBlock({
   onUpdate,
   onRemove,
 }: InvestigationSetBlockProps) {
+  const dateFieldKey = ibdInvestigationFieldKey(setIndex);
+  const hasDateError = useAssessmentFieldError(dateFieldKey);
+  const [dateFocused, setDateFocused] = React.useState(false);
   const setFieldValue = (fieldId: IbdInvestigationFieldId, value: string) => {
     onUpdate({
       values: { ...set.values, [fieldId]: value },
@@ -172,18 +181,26 @@ function InvestigationSetBlock({
           </thead>
           <tbody>
             <tr>
-              <td style={labelCell}>
+              <td style={{
+                ...labelCell,
+                color: hasDateError ? FIELD_ERROR_LABEL : labelCell.color,
+                fontWeight: hasDateError ? 700 : labelCell.fontWeight,
+              }}>
                 Date of Assessment<span style={{ color: '#dc2626', marginLeft: 3 }}>*</span>
               </td>
               <td style={valueCell}>
                 <input
                   type="date"
                   required
-                  style={dateInputStyle}
+                  style={{
+                    ...dateInputStyle,
+                    borderColor: fieldBorderColor(hasDateError, dateFocused),
+                    background: hasDateError ? '#fef2f2' : '#ffffff',
+                  }}
                   value={set.assessmentDate || ''}
                   onChange={(e) => onUpdate({ assessmentDate: e.target.value })}
-                  onFocus={(e) => { e.target.style.borderColor = '#0891b2'; }}
-                  onBlur={(e) => { e.target.style.borderColor = '#cbd5e1'; }}
+                  onFocus={() => setDateFocused(true)}
+                  onBlur={() => setDateFocused(false)}
                 />
               </td>
             </tr>

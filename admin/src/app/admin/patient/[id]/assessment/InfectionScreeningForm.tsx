@@ -14,6 +14,13 @@ import {
   type InfectionScreeningData,
 } from '@/lib/infection-screening';
 import { isFutureIsoDate, todayIsoDate } from '@/lib/iso-date';
+import {
+  fieldBorderColor,
+  fieldGroupErrorStyle,
+  FIELD_ERROR_LABEL,
+  infectionScreeningFieldKey,
+  useAssessmentFieldError,
+} from './assessment-field-errors';
 
 const inter = "'Inter', sans-serif";
 const maxDate = todayIsoDate();
@@ -63,18 +70,22 @@ function readInfectionScreening(data: AssessmentFormState): InfectionScreeningDa
 }
 
 function PickListField({
+  fieldKey,
   label,
   required,
   value,
   onChange,
   indent = false,
 }: {
+  fieldKey: string;
   label: string;
   required?: boolean;
   value: string;
   onChange: (value: string) => void;
   indent?: boolean;
 }) {
+  const hasError = useAssessmentFieldError(fieldKey);
+  const [focused, setFocused] = React.useState(false);
   return (
     <div
       style={{
@@ -83,23 +94,27 @@ function PickListField({
         gap: 6,
         paddingLeft: indent ? 16 : 0,
         borderLeft: indent ? '2px solid #e2e8f0' : undefined,
+        ...fieldGroupErrorStyle(hasError),
       }}
     >
-      <label style={fieldLabelStyle}>
+      <label style={{
+        ...fieldLabelStyle,
+        color: hasError ? FIELD_ERROR_LABEL : fieldLabelStyle.color,
+      }}>
         {label}
         {required ? <span style={{ color: '#dc2626', marginLeft: 4 }}>*</span> : null}
       </label>
       <select
-        style={selectStyle}
+        style={{
+          ...selectStyle,
+          borderColor: fieldBorderColor(hasError, focused),
+          background: hasError ? '#fef2f2' : '#ffffff',
+        }}
         value={value}
         required={required}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={(e) => {
-          e.target.style.borderColor = '#0891b2';
-        }}
-        onBlur={(e) => {
-          e.target.style.borderColor = '#cbd5e1';
-        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
       >
         <option value="">—</option>
         {INFECTION_SCREENING_PICKLIST_OPTIONS.map((opt) => (
@@ -125,6 +140,9 @@ function ScreeningSetBlock({
   onUpdate: (patch: Partial<InfectionScreeningSet>) => void;
   onRemove: () => void;
 }) {
+  const screeningDateFieldKey = infectionScreeningFieldKey(setIndex, 'screeningDate');
+  const hasScreeningDateError = useAssessmentFieldError(screeningDateFieldKey);
+  const [screeningDateFocused, setScreeningDateFocused] = React.useState(false);
   const updateScreeningDate = (value: string) => {
     if (value && isFutureIsoDate(value)) return;
     onUpdate({ screeningDate: value });
@@ -165,7 +183,7 @@ function ScreeningSetBlock({
               fontWeight: 700,
               letterSpacing: '0.06em',
               textTransform: 'uppercase',
-              color: '#e0f2fe',
+              color: hasScreeningDateError ? '#fecaca' : '#e0f2fe',
               fontFamily: inter,
               whiteSpace: 'nowrap',
             }}
@@ -186,18 +204,14 @@ function ScreeningSetBlock({
               fontWeight: 500,
               fontFamily: inter,
               color: '#0f172a',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
+              background: hasScreeningDateError ? '#fef2f2' : '#ffffff',
+              border: `1px solid ${fieldBorderColor(hasScreeningDateError, screeningDateFocused)}`,
               borderRadius: 6,
               outline: 'none',
               cursor: 'pointer',
             }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#0891b2';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = '#cbd5e1';
-            }}
+            onFocus={() => setScreeningDateFocused(true)}
+            onBlur={() => setScreeningDateFocused(false)}
           />
           {canRemove ? (
             <button
@@ -242,6 +256,7 @@ function ScreeningSetBlock({
           {TB_SCREENING_SUBFIELDS.map((field) => (
             <PickListField
               key={field.id}
+              fieldKey={infectionScreeningFieldKey(setIndex, field.id)}
               label={field.label}
               required
               indent
@@ -254,6 +269,7 @@ function ScreeningSetBlock({
         {INFECTION_SCREENING_FIELDS.map((field) => (
           <PickListField
             key={field.id}
+            fieldKey={infectionScreeningFieldKey(setIndex, field.id)}
             label={field.label}
             required
             value={set[field.id]}

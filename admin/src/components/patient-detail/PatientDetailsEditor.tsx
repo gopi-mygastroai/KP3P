@@ -2,72 +2,16 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  AdminStep1,
-  AdminStep2,
-  AdminStep4,
-  AdminStep5,
-  AdminStep6,
-  AdminStep7,
-  AdminStep8,
-  AdminStep9,
-} from '@/app/admin/patient/[id]/assessment/AdminAssessmentSteps';
 import type { AssessmentFormState, AssessmentUpdateFn, PatientWithUser } from '@/types/assessment-form';
 import { getErrorMessage } from '@/lib/get-error-message';
 import { buildAssessmentFormState, buildAssessmentSavePayload } from '@/lib/build-assessment-form-state';
-
-const STEP_LABELS = [
-  'Basic Info',
-  'Disease Characteristics',
-  'Symptoms',
-  'Investigations',
-  'Radiology',
-  'Treatment History',
-  'Vaccination History',
-  'Screening',
-] as const;
-
-const STEP_HEADINGS = [
-  'Patient Characteristics',
-  'Disease Characteristics',
-  'Disease Activity & Symptoms',
-  'Laboratory & Investigations',
-  'Radiology Investigations',
-  'Treatment History',
-  'Vaccination History',
-  'Comorbidities & Infection Screening',
-] as const;
-
-const STEP_COMPONENTS = [
-  AdminStep1,
-  AdminStep4,
-  AdminStep5,
-  AdminStep6,
-  AdminStep7,
-  AdminStep8,
-  AdminStep2,
-  AdminStep9,
-] as const;
-
-type SectionConfig = {
-  step: number;
-  stepLabel: (typeof STEP_LABELS)[number];
-  heading: (typeof STEP_HEADINGS)[number];
-  Component: (typeof STEP_COMPONENTS)[number];
-  compact?: boolean;
-};
-
-const SECTIONS: SectionConfig[] = STEP_LABELS.map((stepLabel, index) => ({
-  step: index + 1,
-  stepLabel,
-  heading: STEP_HEADINGS[index],
-  Component: STEP_COMPONENTS[index],
-  compact: index === 3 || index === 4,
-}));
+import PatientDetailsSectionNav from '@/components/patient-detail/PatientDetailsSectionNav';
+import { PATIENT_DETAIL_SECTIONS } from '@/components/patient-detail/patient-details-sections';
 
 type Props = {
   patient: PatientWithUser;
   chromeless?: boolean;
+  showSectionNav?: boolean;
   onSaveReady?: (save: () => Promise<void>, isSaving: boolean) => void;
   onSaved?: () => void;
 };
@@ -75,6 +19,7 @@ type Props = {
 export default function PatientDetailsEditor({
   patient,
   chromeless = false,
+  showSectionNav = true,
   onSaveReady,
   onSaved,
 }: Props) {
@@ -126,14 +71,7 @@ export default function PatientDetailsEditor({
     <>
       <style>{`
         .pde-root { max-width: 1100px; margin: 0 auto; padding: ${chromeless ? '0' : '16px 28px 80px'}; }
-        .pde-section-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-        .pde-section-link {
-          font-size: 11px; font-weight: 600; text-decoration: none;
-          padding: 6px 12px; border-radius: 7px;
-          background: #f1f5f9; color: #475569; border: 0.5px solid #e2e8f0;
-        }
-        .pde-section-link:hover { background: #e2e8f0; color: #0f172a; }
-        .pde-card { background: #fff; border: 0.5px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+        .pde-card { background: #fff; border: 0.5px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 14px; scroll-margin-top: 140px; }
         .pde-card-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #f8fafc; border-bottom: 0.5px solid #e2e8f0; }
         .pde-card-num { font-size: 10px; color: #cbd5e1; font-family: 'IBM Plex Mono', monospace; margin-left: auto; }
         .pde-card-body { padding: 20px 24px; }
@@ -143,15 +81,9 @@ export default function PatientDetailsEditor({
       <div className="pde-root">
         {error ? <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{error}</p> : null}
 
-        <nav className="pde-section-nav" aria-label="Assessment sections">
-          {SECTIONS.map((section) => (
-            <a key={section.step} className="pde-section-link" href={`#pde-step-${section.step}`}>
-              {section.step}. {section.stepLabel}
-            </a>
-          ))}
-        </nav>
+        {showSectionNav ? <PatientDetailsSectionNav /> : null}
 
-        {SECTIONS.map((section) => {
+        {PATIENT_DETAIL_SECTIONS.map((section) => {
           const StepComponent = section.Component;
           return (
             <section key={section.step} id={`pde-step-${section.step}`} className="pde-card">
@@ -165,7 +97,7 @@ export default function PatientDetailsEditor({
                     textTransform: 'uppercase',
                   }}
                 >
-                  Step {section.step} of 7 — {section.stepLabel}
+                  Step {section.step} of 8 — {section.stepLabel}
                 </span>
                 <span className="pde-card-num">{String(section.step).padStart(2, '0')}</span>
               </div>

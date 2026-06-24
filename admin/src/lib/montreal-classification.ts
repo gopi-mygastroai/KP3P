@@ -64,24 +64,39 @@ export function montrealValidationMissing(
   primaryDiagnosis: unknown,
   fields: MontrealFieldValues,
 ): string[] {
+  return montrealValidationFieldErrors(primaryDiagnosis, fields).map((error) => error.label);
+}
+
+export function montrealValidationFieldErrors(
+  primaryDiagnosis: unknown,
+  fields: MontrealFieldValues,
+): Array<{ fieldKey: keyof MontrealFieldValues; label: string }> {
   const diagnosis = String(primaryDiagnosis ?? '').trim();
-  const missing: string[] = [];
+  const missing: Array<{ fieldKey: keyof MontrealFieldValues; label: string }> = [];
 
   if (diagnosis === 'Ulcerative Colitis') {
     if (!isNonEmpty(fields.montrealAgeAtDiagnosis)) {
-      missing.push('Age at Diagnosis (Montreal)');
+      missing.push({ fieldKey: 'montrealAgeAtDiagnosis', label: 'Age at Diagnosis (Montreal)' });
     }
     if (!isNonEmpty(fields.ucExtent)) {
-      missing.push('Extent of UC');
+      missing.push({ fieldKey: 'ucExtent', label: 'Extent of UC' });
     }
     return missing;
   }
 
   if (diagnosis === "Crohn's Disease") {
-    if (!isNonEmpty(fields.montrealAgeAtDiagnosis)) missing.push('Age at Diagnosis (Montreal)');
-    if (!isNonEmpty(fields.diseaseLocation)) missing.push('Location of the disease');
-    if (!isNonEmpty(fields.diseaseBehavior)) missing.push('Behavior');
-    if (!isNonEmpty(fields.perianalDisease)) missing.push('Perianal');
+    if (!isNonEmpty(fields.montrealAgeAtDiagnosis)) {
+      missing.push({ fieldKey: 'montrealAgeAtDiagnosis', label: 'Age at Diagnosis (Montreal)' });
+    }
+    if (!isNonEmpty(fields.diseaseLocation)) {
+      missing.push({ fieldKey: 'diseaseLocation', label: 'Location of the disease' });
+    }
+    if (!isNonEmpty(fields.diseaseBehavior)) {
+      missing.push({ fieldKey: 'diseaseBehavior', label: 'Behavior' });
+    }
+    if (!isNonEmpty(fields.perianalDisease)) {
+      missing.push({ fieldKey: 'perianalDisease', label: 'Perianal' });
+    }
   }
 
   return missing;

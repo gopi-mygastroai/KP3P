@@ -153,12 +153,11 @@ function RadiologySetBlock({
           <tbody>
             <tr>
               <td style={labelCell}>
-                Date of Assessment<span style={{ color: '#dc2626', marginLeft: 3 }}>*</span>
+                Date of Assessment
               </td>
               <td style={valueCell}>
                 <input
                   type="date"
-                  required
                   style={dateInputStyle}
                   value={set.assessmentDate || ''}
                   onChange={(e) => onUpdate({ assessmentDate: e.target.value })}

@@ -45,6 +45,7 @@ import {
   normalizeInfectionScreening,
 } from '@/lib/infection-screening';
 import type { PatientWithUser, AssessmentFormState } from '@/types/assessment-form';
+import { sanitizeNoneExclusiveSelection } from '@/lib/none-exclusive-multi-select';
 
 function assessmentField(data: AssessmentFormState, key: string): unknown {
   return (data as Record<string, unknown>)[key];
@@ -55,7 +56,9 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
   try {
     if (typeof previousSurgeries === 'string') {
       const p = JSON.parse(previousSurgeries) as unknown;
-      previousSurgeries = Array.isArray(p) ? (p as string[]) : previousSurgeries;
+      previousSurgeries = Array.isArray(p) ? sanitizeNoneExclusiveSelection(p as string[]) : previousSurgeries;
+    } else if (Array.isArray(previousSurgeries)) {
+      previousSurgeries = sanitizeNoneExclusiveSelection(previousSurgeries);
     }
   } catch {
     /* keep string */
@@ -65,7 +68,9 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
   try {
     if (typeof comorbidities === 'string') {
       const p = JSON.parse(comorbidities) as unknown;
-      comorbidities = Array.isArray(p) ? (p as string[]) : comorbidities;
+      comorbidities = Array.isArray(p) ? sanitizeNoneExclusiveSelection(p as string[]) : comorbidities;
+    } else if (Array.isArray(comorbidities)) {
+      comorbidities = sanitizeNoneExclusiveSelection(comorbidities);
     }
   } catch {
     /* keep string */
@@ -77,12 +82,16 @@ export function buildAssessmentFormState(patient: PatientWithUser): AssessmentFo
       const trimmed = extraintestinalManif.trim();
       if (trimmed.startsWith('[')) {
         const p = JSON.parse(trimmed) as unknown;
-        extraintestinalManif = Array.isArray(p) ? (p as string[]) : extraintestinalManif;
+        extraintestinalManif = Array.isArray(p)
+          ? sanitizeNoneExclusiveSelection(p as string[])
+          : extraintestinalManif;
       } else if (trimmed) {
         extraintestinalManif = [trimmed];
       } else {
         extraintestinalManif = [];
       }
+    } else if (Array.isArray(extraintestinalManif)) {
+      extraintestinalManif = sanitizeNoneExclusiveSelection(extraintestinalManif);
     }
   } catch {
     extraintestinalManif = [];
@@ -286,6 +295,12 @@ export function buildAssessmentSavePayload(
     payload.infectionScreening = serializeInfectionScreening(
       normalizeInfectionScreening(parseInfectionScreening(payload.infectionScreening)),
     );
+  }
+
+  for (const key of ['previousSurgeries', 'comorbidities', 'extraintestinalManif'] as const) {
+    if (key in payload && Array.isArray(payload[key])) {
+      payload[key] = sanitizeNoneExclusiveSelection(payload[key] as string[]);
+    }
   }
 
   return { ...payload, ...overrides };
