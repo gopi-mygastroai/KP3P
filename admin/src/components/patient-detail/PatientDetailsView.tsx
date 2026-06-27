@@ -88,11 +88,11 @@ export default function PatientDetailsView({ patient }: Props) {
   return (
     <>
       <style>{patientDetailsViewStyles}</style>
-      {/* ── BODY ── */}
+      <div className="pr-view">
         <div className="pr-body">
 
           {/* LEFT COLUMN */}
-          <div>
+          <div className="pr-main-column">
 
             {/* 01 Patient Characteristics */}
             <div className="pr-card">
@@ -514,7 +514,7 @@ export default function PatientDetailsView({ patient }: Props) {
           </div>
 
           {/* RIGHT SIDEBAR */}
-          <div>
+          <div className="pr-sidebar-column">
 
             <div className="pr-sidebar-card">
               <div className="pr-sidebar-head">Disease Activity</div>
@@ -598,6 +598,7 @@ export default function PatientDetailsView({ patient }: Props) {
 
           </div>
         </div>
+      </div>
     </>
   );
 }

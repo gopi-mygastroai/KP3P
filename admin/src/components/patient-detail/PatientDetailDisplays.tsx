@@ -49,6 +49,10 @@ import {
 
 const tableWrap: CSSProperties = {
   overflowX: 'auto',
+  maxWidth: '100%',
+  width: '100%',
+  minWidth: 0,
+  WebkitOverflowScrolling: 'touch',
   border: '0.5px solid #e2e8f0',
   borderRadius: 10,
   margin: '8px 12px 12px',
@@ -318,7 +322,7 @@ export function SesCdScoringDisplay({ raw }: { raw: unknown }) {
           Total: {grandTotal} / 60 — {interpretation.display}
         </span>
       </div>
-      <div style={tableWrap}>
+      <div className="pr-contained-scroll" style={tableWrap}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
           <thead>
             <tr>
@@ -373,7 +377,7 @@ export function UpperGiFindingsDisplay({
     <div className="pr-field-section" style={{ margin: '4px 8px 12px' }}>
       <div className="pr-field-section-title">Upper GI Findings</div>
       {filledRows.length > 0 ? (
-        <div style={tableWrap}>
+        <div className="pr-contained-scroll" style={tableWrap}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
             <thead>
               <tr>
@@ -441,8 +445,13 @@ export function CurrentIbdMedicationsDisplay({ raw }: { raw: unknown }) {
         </span>
       </div>
       <div
+        className="pr-contained-scroll"
         style={{
           overflowX: 'auto',
+          maxWidth: '100%',
+          width: '100%',
+          minWidth: 0,
+          WebkitOverflowScrolling: 'touch',
           border: `1px solid ${MED_SECTION_HEADER}`,
           borderTop: 'none',
           borderRadius: '0 0 8px 8px',

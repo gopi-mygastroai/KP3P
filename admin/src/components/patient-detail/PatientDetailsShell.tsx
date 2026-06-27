@@ -33,8 +33,23 @@ export default function PatientDetailsShell({ patient }: Props) {
   return (
     <>
       <style>{`
+        .pds-shell {
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          min-width: 0;
+          margin-inline: auto;
+          overflow-x: hidden;
+          padding-inline: clamp(12px, 2vw, 28px);
+          padding-bottom: 80px;
+        }
+        @media (min-width: 1400px) {
+          .pds-shell {
+            padding-inline: clamp(24px, 3vw, 48px);
+          }
+        }
         @media (max-width: 860px) {
-          .pds-shell { padding-left: 16px !important; padding-right: 16px !important; }
+          .pds-shell { padding-inline: 16px; }
           .pds-edit-sticky-chrome {
             margin-left: -16px !important;
             margin-right: -16px !important;
@@ -46,8 +61,8 @@ export default function PatientDetailsShell({ patient }: Props) {
           position: sticky;
           top: 0;
           z-index: 20;
-          margin: 0 -28px 16px;
-          padding: 0 28px 12px;
+          margin: 0 calc(-1 * clamp(12px, 2vw, 28px)) 16px;
+          padding: 0 clamp(12px, 2vw, 28px) 12px;
           background: rgba(255, 255, 255, 0.97);
           backdrop-filter: blur(10px);
           border-bottom: 1px solid #e2e8f0;
@@ -63,7 +78,7 @@ export default function PatientDetailsShell({ patient }: Props) {
           backdrop-filter: none;
         }
       `}</style>
-      <div className="pds-shell" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 28px 80px' }}>
+      <div className="pds-shell">
         {editing ? (
           <>
             <div className="pds-edit-sticky-chrome">

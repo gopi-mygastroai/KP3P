@@ -47,14 +47,17 @@ export default async function PatientDetailsPage({ params }: { params: Promise<{
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #f1f5f9; font-family: 'Inter', system-ui, sans-serif; }
 
-        .pr-root { min-height: 100vh; background: #f1f5f9; color: #0f172a; }
+        .pr-root { min-height: 100vh; background: #f1f5f9; color: #0f172a; width: 100%; max-width: 100%; overflow-x: hidden; }
 
         .pr-header {
           background: linear-gradient(165deg, #0c1222 0%, #152238 48%, #1a2d4a 100%);
-          padding: 0 28px 0;
+          padding: 0 clamp(16px, 2vw, 28px) 0;
           border-bottom: 1px solid rgba(56, 189, 248, 0.22);
           box-shadow: 0 4px 24px rgba(15, 23, 42, 0.35);
           position: relative;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
         }
         .pr-header::after {
           content: '';

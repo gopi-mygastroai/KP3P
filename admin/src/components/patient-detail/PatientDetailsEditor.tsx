@@ -70,7 +70,14 @@ export default function PatientDetailsEditor({
   return (
     <>
       <style>{`
-        .pde-root { max-width: 1100px; margin: 0 auto; padding: ${chromeless ? '0' : '16px 28px 80px'}; }
+        .pde-root {
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+          overflow-x: hidden;
+          padding: ${chromeless ? '0' : '16px clamp(12px, 2vw, 28px) 80px'};
+        }
         .pde-card { background: #fff; border: 0.5px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 14px; scroll-margin-top: 140px; }
         .pde-card-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #f8fafc; border-bottom: 0.5px solid #e2e8f0; }
         .pde-card-num { font-size: 10px; color: #cbd5e1; font-family: 'IBM Plex Mono', monospace; margin-left: auto; }
