@@ -7,7 +7,9 @@ type Props = {
   patientId: number;
   onEdit?: () => void;
   onSave?: () => void;
+  onDelete?: () => void;
   isSaving?: boolean;
+  isDeleting?: boolean;
   savedAt?: Date | null;
   sticky?: boolean;
 };
@@ -17,7 +19,9 @@ export default function PatientDetailsActionBar({
   patientId,
   onEdit,
   onSave,
+  onDelete,
   isSaving = false,
+  isDeleting = false,
   savedAt = null,
   sticky = false,
 }: Props) {
@@ -58,7 +62,28 @@ export default function PatientDetailsActionBar({
           </div>
         ) : null}
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        {mode === 'edit' && onDelete ? (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={isSaving || isDeleting}
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              padding: '8px 14px',
+              borderRadius: 8,
+              background: '#fff1f2',
+              border: '1px solid #fecdd3',
+              color: '#be123c',
+              cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+              opacity: isSaving || isDeleting ? 0.6 : 1,
+              marginRight: 'auto',
+            }}
+          >
+            Delete patient
+          </button>
+        ) : null}
         {mode === 'edit' ? (
           <Link
             href={`/admin/patient/${patientId}/assessment`}
@@ -97,7 +122,7 @@ export default function PatientDetailsActionBar({
           <button
             type="button"
             onClick={onSave}
-            disabled={isSaving}
+            disabled={isSaving || isDeleting}
             style={{
               fontSize: 12,
               fontWeight: 700,
@@ -106,8 +131,8 @@ export default function PatientDetailsActionBar({
               background: '#14b8a6',
               border: 'none',
               color: '#0f172a',
-              cursor: isSaving ? 'not-allowed' : 'pointer',
-              opacity: isSaving ? 0.8 : 1,
+              cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+              opacity: isSaving || isDeleting ? 0.8 : 1,
             }}
           >
             {isSaving ? 'Saving…' : 'Save changes'}
