@@ -228,4 +228,5 @@ OUTPUT RULES
 - Use only: <h2> <h3> <h4> <h5> <table> <tr> <th> <td> <ul> <li> <b> <p> <br> <hr> <div>
 - No custom CSS or inline styles.
 - Replace all [PLACEHOLDERS] with specific clinical data from the patient record.
-- Follow the HTML template structure in the user message exactly.`;
+- Follow the HTML template structure in the user message exactly.
+- After completing Document 3, append exactly this final marker on the last line and stop: <div data-kp3p-end="true"></div>`;

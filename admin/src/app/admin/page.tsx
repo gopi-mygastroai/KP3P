@@ -1,40 +1,22 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import LogoutButton from './LogoutButton';
-import { prisma } from '@/lib/prisma';
 import PatientSubmissionsClient, { type PatientRow } from './PatientSubmissionsClient';
+import { getAdminPatients } from '@/lib/patient-repository';
+import { getAppSession } from '@/lib/auth/session';
 
 export const metadata = {
   title: 'Admin Dashboard - MyGastro.Ai',
 };
 
 export default async function AdminPage() {
-  const cookieStore = await cookies();
-  const userRole = cookieStore.get('userRole');
-  if (userRole?.value !== 'ADMIN') {
+  const session = await getAppSession();
+  if (session.role !== 'ADMIN') {
     redirect('/');
   }
 
-  const patients = await prisma.patient.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: { user: true },
-  });
-
-  const patientRows: PatientRow[] = patients.map((p) => ({
-    id: p.id,
-    createdAt: p.createdAt.toISOString(),
-    name: p.name,
-    mrn: p.mrn,
-    patientEmail: p.email,
-    submitterEmail: p.user?.email ?? null,
-    contactPhone: p.contactPhone,
-    primaryDiagnosis: p.primaryDiagnosis,
-    currentDiseaseActivity: p.currentDiseaseActivity,
-    currentAge: p.currentAge,
-    assessmentComplete: p.assessmentComplete === true,
-  }));
+  const patientRows: PatientRow[] = await getAdminPatients();
 
   return (
     <>

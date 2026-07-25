@@ -4,12 +4,13 @@ import { useState } from 'react';
 import { getErrorMessage } from '@/lib/get-error-message';
 import { ADMIN_LOGIN_EMAIL } from '@/lib/auth-credentials';
 
+const INTAKE_APP_URL =
+  process.env.NEXT_PUBLIC_INTAKE_APP_URL?.trim() || 'http://localhost:3001';
+
 export default function AuthForm() {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -18,20 +19,17 @@ export default function AuthForm() {
     setError('');
     setLoading(true);
 
-    if (isLogin && email.trim().toLowerCase() !== ADMIN_LOGIN_EMAIL) {
+    if (email.trim().toLowerCase() !== ADMIN_LOGIN_EMAIL) {
       setError('Invalid username.');
       setLoading(false);
       return;
     }
 
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-    const payload = isLogin ? { email, password } : { email, password, name };
-
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ email, password }),
       });
 
       let data: { error?: string; user?: { role?: string } };
@@ -45,8 +43,7 @@ export default function AuthForm() {
         throw new Error(data.error || 'Something went wrong');
       }
 
-      const role = data.user?.role;
-      window.location.href = role === 'ADMIN' ? '/admin' : '/form';
+      window.location.href = '/admin';
     } catch (err: unknown) {
       setError(getErrorMessage(err));
     } finally {
@@ -63,23 +60,6 @@ export default function AuthForm() {
       )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {!isLogin && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-            <label style={{ fontWeight: 700, color: '#111827', fontSize: '0.8rem', letterSpacing: '0.05em' }}>
-              FULL NAME
-            </label>
-            <input
-              type="text"
-              className="form-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required={!isLogin}
-              placeholder="John Doe"
-            />
-          </div>
-        )}
-
-        {/* EMAIL ID */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
           <label style={{ fontWeight: 700, color: '#111827', fontSize: '0.8rem', letterSpacing: '0.05em' }}>
             EMAIL ID
@@ -94,7 +74,6 @@ export default function AuthForm() {
           />
         </div>
 
-        {/* PASSWORD */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
           <label style={{ fontWeight: 700, color: '#111827', fontSize: '0.8rem', letterSpacing: '0.05em' }}>
             PASSWORD
@@ -146,11 +125,10 @@ export default function AuthForm() {
           className="btn btn-primary w-full"
           disabled={loading}
         >
-          {loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}
+          {loading ? 'Please wait...' : 'Sign In'}
         </button>
       </form>
 
-      {/* OR divider */}
       <div style={{ marginTop: '1.25rem', marginBottom: '1rem' }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <div style={{ flex: 1, borderTop: '1px solid #e5e7eb' }} />
@@ -161,25 +139,15 @@ export default function AuthForm() {
         </div>
       </div>
 
-      {/* Sign up link */}
-      <div style={{ textAlign: 'center', fontSize: '0.875rem' }}>
-        <span style={{ color: '#6b7280', marginRight: '0.25rem' }}>
-          {isLogin ? "Don't have an account?" : 'Already have an account?'}
-        </span>
-        <button
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            fontWeight: 600,
-            color: '#0891b2',
-          }}
-          onClick={() => setIsLogin(!isLogin)}
-          type="button"
-        >
-          {isLogin ? 'Sign Up' : 'Sign In'}
-        </button>
-      </div>
+      <button
+        type="button"
+        className="btn btn-secondary w-full"
+        onClick={() => {
+          window.location.href = INTAKE_APP_URL;
+        }}
+      >
+        Patient Intake Form
+      </button>
     </div>
   );
 }

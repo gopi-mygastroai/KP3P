@@ -1,8 +1,11 @@
-import type { Prisma } from '@prisma/client';
+import type { PatientWithUser } from '@/types/patient';
 
-export type PatientWithUser = Prisma.PatientGetPayload<{ include: { user: true } }>;
+export type { PatientWithUser } from '@/types/patient';
 
-export type AssessmentFormState = Omit<PatientWithUser, 'previousSurgeries' | 'comorbidities' | 'extraintestinalManif'> & {
+export type AssessmentFormState = Omit<
+  PatientWithUser,
+  'previousSurgeries' | 'comorbidities' | 'extraintestinalManif'
+> & {
   previousSurgeries: string | string[];
   comorbidities: string | string[];
   extraintestinalManif: string | string[];

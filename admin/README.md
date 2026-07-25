@@ -1,20 +1,21 @@
 # KP3P Admin
 
-Next.js admin dashboard for patient records, assessments, **KP-3P care sheet generation** (Claude or Gemini), and optional Google Drive uploads. Uses Prisma and PostgreSQL.
+Next.js admin dashboard for patient records, assessments, **KP-3P care sheet generation** (Claude or Gemini), and optional Google Drive uploads. Uses **Supabase** (PostgreSQL, Auth, RLS) for data and authentication. Prisma is retained only for schema migrations (`prisma/schema.prisma`).
 
 Monorepo overview: [`../README.md`](../README.md).
 
 ## Prerequisites
 
 - Node.js (LTS) and npm
-- PostgreSQL (see [`prisma/schema.prisma`](prisma/schema.prisma))
+- Supabase project (PostgreSQL + Auth)
+- PostgreSQL connection strings for running migrations (see [`prisma/schema.prisma`](prisma/schema.prisma))
 
 ## Setup
 
 ```bash
 cd admin
 cp .env.example .env
-# Set POSTGRES_PRISMA_URL, POSTGRES_URL_NON_POOLING, and LLM keys (see below).
+# Set SUPABASE_*, POSTGRES_* (for migrations), and LLM keys (see below).
 
 npm ci
 npx prisma migrate deploy   # or `prisma migrate dev` locally
@@ -29,13 +30,19 @@ See [`.env.example`](.env.example). Required for normal operation:
 
 | Variable | Purpose |
 |----------|---------|
-| `POSTGRES_PRISMA_URL` | Pooled Postgres URL for the app |
-| `POSTGRES_URL_NON_POOLING` | Direct URL for `prisma migrate` |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server-side repository tasks) |
+| `SUPABASE_ANON_KEY` | Anon key (auth/session + RLS-scoped queries) |
+| `POSTGRES_PRISMA_URL` | Pooled Postgres URL — for `prisma migrate` only |
+| `POSTGRES_URL_NON_POOLING` | Direct URL — for `prisma migrate` only |
+| `NEXT_PUBLIC_INTAKE_APP_URL` | Patient intake app URL (default `http://localhost:3001`) |
 | `LLM_PROVIDER` | `gemini` (default) or `claude` |
 | `ANTHROPIC_API_KEY` | Required when `LLM_PROVIDER=claude` |
 | `GEMINI_API_KEY` | Required when `LLM_PROVIDER=gemini` |
 
 Optional: `CLAUDE_MODEL`, `GEMINI_MODEL`, Google Drive OAuth fields (`GDRIVE_*`).
+
+Prisma Client runtime tuning (`PRISMA_LOG_QUERIES`, `PRISMA_CONNECTION_LIMIT`, `PRISMA_POOL_TIMEOUT`, `PRISMA_PG_BOUNCER`) is unused and commented out in `.env.example`.
 
 After changing env vars, restart `npm run dev`.
 
@@ -56,14 +63,80 @@ After changing env vars, restart `npm run dev`.
 | Command | Purpose |
 |---------|---------|
 | `npm run dev` | Dev server (`next dev --webpack`) |
-| `npm run build` | `prisma generate` + `next build` |
+| `npm run build` | `next build` |
 | `npm run start` | Production server |
 | `npm run lint` | ESLint |
 | `npm run test:llm` | Smoke test active LLM provider |
 | `npm run seed:rulebook-text` | Extract rulebook PDF → `.txt` cache |
 | `npm run count:llm-tokens` | Estimate prompt token size for a sample patient |
+| `npm run create:admin-user` | Create/update Supabase Auth admin user |
 
 Legacy/script-only: `test:openrouter`, `test:generate-care-sheet`, `seed:care-sheet-prompt`.
+
+## Supabase Auth + RLS
+
+The app uses Supabase Auth for login and Supabase JS for all runtime data access. Row-level security policies enforce admin vs owner access at the database level.
+
+1. Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
+2. Run `npx prisma migrate deploy` to create tables.
+3. Run `supabase/01_auth_identity_and_rls.sql` in Supabase SQL editor.
+4. Create the admin auth user (once per environment):
+
+```bash
+node scripts/create-admin-user.mjs admin@mygastro.ai "<your-password>"
+```
+
+## Deploy on Vercel
+
+### 1. Push code
+
+Commit and push to `main`. Vercel redeploys automatically if the project is linked to GitHub.
+
+Ensure **Root Directory** in Vercel project settings is `admin` (monorepo layout).
+
+### 2. Set environment variables
+
+In Vercel → Project → Settings → Environment Variables, set these for **Production**:
+
+| Variable | Value |
+|----------|-------|
+| `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
+| `SUPABASE_ANON_KEY` | From Supabase → Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | From Supabase → Settings → API (server-only) |
+| `LLM_PROVIDER` | `gemini` or `claude` |
+| `GEMINI_API_KEY` | Required when `LLM_PROVIDER=gemini` |
+| `ANTHROPIC_API_KEY` | Required when `LLM_PROVIDER=claude` |
+
+Optional: `CLAUDE_MODEL`, `GEMINI_MODEL`, `GDRIVE_*`.
+
+`POSTGRES_*` URLs are **not** required at runtime or build time (only for running migrations locally).
+
+After changing env vars, trigger a **Redeploy**.
+
+### 3. One-time Supabase setup (production DB)
+
+If not already done on the same Supabase project Vercel uses:
+
+1. Run `npx prisma migrate deploy` against that database (from `admin/` with production URLs).
+2. Run `supabase/01_auth_identity_and_rls.sql` in Supabase SQL editor.
+3. Create admin user: `node scripts/create-admin-user.mjs admin@mygastro.ai "<password>"`.
+
+### 4. Production smoke test
+
+After deploy succeeds:
+
+| Step | Expected |
+|------|----------|
+| Open `/` | Login page loads |
+| Login with `admin@mygastro.ai` | Redirects to `/admin` |
+| Patient list | Loads (may be empty) |
+| Create patient (`/admin/patient/new`) | Saves and redirects |
+| Open assessment → Disease Characteristics → Save | Saves without 401/500 |
+| Generate care sheet (if LLM key set) | Streams output |
+
+If login returns 401, confirm the admin user exists in Supabase Auth (Authentication → Users).
+
+If save returns 500 with `updatedAt` or RLS errors, confirm migrations and RLS SQL ran on production DB.
 
 ## Deploy on Google Cloud Run
 
@@ -85,10 +158,13 @@ gcloud artifacts repositories create kp3p-repo --repository-format=docker --loca
 
 | Secret name | Purpose |
 |-------------|---------|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
 | `ANTHROPIC_API_KEY` | Anthropic Claude API key |
 | `GEMINI_API_KEY` | Google Gemini API key |
-| `POSTGRES_PRISMA_URL` | Pooled Postgres connection URL |
-| `POSTGRES_URL_NON_POOLING` | Direct Postgres URL for migrations |
+| `POSTGRES_PRISMA_URL` | Pooled Postgres URL (migrations only) |
+| `POSTGRES_URL_NON_POOLING` | Direct Postgres URL (migrations only) |
 | `LLM_PROVIDER` | `claude` or `gemini` |
 
 ### Manual deploy
@@ -131,7 +207,9 @@ Test locally:
 ```bash
 docker build -t kp3p-admin .
 docker run -p 8080:8080 \
-  -e POSTGRES_PRISMA_URL="postgresql://test" \
+  -e SUPABASE_URL="https://<project-ref>.supabase.co" \
+  -e SUPABASE_ANON_KEY="your_anon_key" \
+  -e SUPABASE_SERVICE_ROLE_KEY="your_service_role_key" \
   -e LLM_PROVIDER="gemini" \
   -e GEMINI_API_KEY="your_gemini_api_key_here" \
   kp3p-admin
@@ -143,11 +221,14 @@ docker run -p 8080:8080 \
 |------|------|
 | `src/app/admin/` | Admin UI (patients, assessments) |
 | `src/app/api/generate-caresheet/` | Streaming care sheet API |
+| `src/lib/supabase/` | Supabase admin + auth session clients |
+| `src/lib/patient-repository.ts` | Runtime patient CRUD via Supabase |
 | `src/lib/llm/` | LLM provider abstraction |
 | `src/lib/load-ibd-rulebook.ts` | PDF / cached text for guidelines |
 | `src/lib/kp3p-prompt.ts` | Patient prompt builder |
+| `supabase/` | Auth identity + RLS SQL (run once per env) |
 | `medical-doc/` | IBD clinical rulebook PDF |
-| `prisma/` | Schema and migrations |
+| `prisma/` | Schema and migrations (migrate only) |
 
 ## Local documentation
 

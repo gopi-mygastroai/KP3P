@@ -1,6 +1,6 @@
 # KP3P
 
-Monorepo for the **KP3P** system: an **admin** dashboard (Next.js, Prisma, PostgreSQL) and a **patient intake** web app (Next.js) that talks to the admin APIs.
+Monorepo for the **KP3P** system: an **admin** dashboard (Next.js, Supabase Auth/DB, Prisma migrations) and a **patient intake** web app (Next.js) that talks to the admin APIs.
 
 ## Clone
 
@@ -13,14 +13,15 @@ cd KP3P
 
 | Directory | Description |
 |-----------|-------------|
-| [`admin/`](admin/) | Admin app — authentication, patients, assessments, **KP-3P care sheet generation** (Claude or Gemini via `src/lib/llm`), optional Google Drive uploads. Default dev URL: [http://localhost:3000](http://localhost:3000). See [`admin/README.md`](admin/README.md). |
+| [`admin/`](admin/) | Admin app — Supabase Auth, patients, assessments, **KP-3P care sheet generation** (Claude or Gemini via `src/lib/llm`), optional Google Drive uploads. Default dev URL: [http://localhost:3000](http://localhost:3000). See [`admin/README.md`](admin/README.md). |
 | [`Patient-intake-form/`](Patient-intake-form/) | Patient-facing intake flow. Default dev URL: [http://localhost:3001](http://localhost:3001). See [`Patient-intake-form/README.md`](Patient-intake-form/README.md). |
 | `medical-lit/` | **Local only** (gitignored) — agent notes, prompt exports, and other docs not needed to build or run the apps. |
 
 ## Prerequisites
 
 - **Node.js** (LTS recommended) and **npm**
-- **PostgreSQL** database for the admin app (see Prisma `datasource` in [`admin/prisma/schema.prisma`](admin/prisma/schema.prisma))
+- **Supabase** project (PostgreSQL + Auth) for the admin app
+- PostgreSQL connection strings for running Prisma migrations only
 
 ## Quick start
 
@@ -29,10 +30,12 @@ cd KP3P
 ```bash
 cd admin
 cp .env.example .env
-# Edit .env: POSTGRES_PRISMA_URL, POSTGRES_URL_NON_POOLING, LLM keys, etc.
+# Edit .env: SUPABASE_*, POSTGRES_* (migrations only), LLM keys, etc.
 
 npm ci
 npx prisma migrate deploy   # or `prisma migrate dev` in development
+# Run admin/supabase/01_auth_identity_and_rls.sql in the Supabase SQL editor (once per env)
+npm run create:admin-user -- admin@mygastro.ai "<your-password>"
 npm run dev
 ```
 
@@ -57,8 +60,10 @@ Run the **admin** app first so intake API calls (`/api/patients`, `/api/drive/up
 
 Details and comments live in each app’s template files:
 
-- **Admin:** [`admin/.env.example`](admin/.env.example) — database URLs, **LLM provider** (`LLM_PROVIDER`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`), optional Google Drive OAuth, script-only keys.
+- **Admin:** [`admin/.env.example`](admin/.env.example) — **Supabase** (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`), Postgres URLs for **migrations only**, intake URL (`NEXT_PUBLIC_INTAKE_APP_URL`), **LLM provider** keys, optional Google Drive OAuth.
 - **Intake:** [`Patient-intake-form/.env.example`](Patient-intake-form/.env.example) — `NEXT_PUBLIC_API_URL`.
+
+Prisma Client runtime tuning vars (`PRISMA_LOG_QUERIES`, `PRISMA_CONNECTION_LIMIT`, etc.) are commented out in `.env.example` — the admin app uses Supabase JS at runtime.
 
 Never commit real `.env` or `.env.local` files; only the `*.example` templates belong in Git.
 
@@ -67,8 +72,8 @@ Never commit real `.env` or `.env.local` files; only the `*.example` templates b
 Configure in `admin/.env` or `admin/.env.local`:
 
 ```env
-# claude (default) | gemini
-LLM_PROVIDER=claude
+# gemini (default) | claude
+LLM_PROVIDER=gemini
 
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -83,6 +88,18 @@ Selection and lazy env validation: [`admin/src/lib/llm/index.ts`](admin/src/lib/
 
 After changing `LLM_PROVIDER` or keys, **restart** `npm run dev`.
 
+## Smoke test (admin after Supabase absorb)
+
+| Step | Expected |
+|------|----------|
+| Open `/` | Login page loads |
+| Login with `admin@mygastro.ai` | Redirects to `/admin` |
+| Patient list | Loads (may be empty) |
+| Create / edit patient | Saves without 401/500 |
+| Assessment save | Persists |
+| Intake submit → admin | New patient appears |
+| Generate care sheet (if LLM key set) | Streams output |
+
 ## Scripts (admin)
 
 From `admin/`:
@@ -90,9 +107,10 @@ From `admin/`:
 | Command | Purpose |
 |---------|---------|
 | `npm run dev` | Development server |
-| `npm run build` | Production build (`prisma generate` + `next build`) |
+| `npm run build` | Production build (`next build`) |
 | `npm run start` | Start production server |
 | `npm run lint` | ESLint |
+| `npm run create:admin-user` | Create/update Supabase Auth admin user |
 | `npm run test:llm` | Smoke test active LLM provider |
 | `npm run seed:rulebook-text` | Extract IBD rulebook PDF to cached `.txt` |
 | `npm run count:llm-tokens` | Estimate care-sheet prompt size |
@@ -108,7 +126,7 @@ See [`admin/package.json`](admin/package.json) for additional script entries (Op
 - Custom domain: [https://www.gastroai.in](https://www.gastroai.in) (via Cloudflare proxy)
 - Docker image stored in Artifact Registry: `asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin`
 - Auto-deploys on every push to `main` branch via Cloud Build trigger (config: [`admin/cloudbuild.yaml`](admin/cloudbuild.yaml))
-- Secrets managed via Google Cloud Secret Manager (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`, `LLM_PROVIDER`)
+- Secrets: include `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, plus LLM keys. `POSTGRES_*` needed for migration jobs only.
 - Container timeout: 60 minutes (solves LLM generation timeout)
 
 To manually deploy:
@@ -140,8 +158,8 @@ gcloud run deploy kp3p-admin \
 
 ## Tech stack
 
-- [Next.js](https://nextjs.org/) (App Router), React, TypeScript (intake) / mixed TS+JS (admin)
-- [Prisma](https://www.prisma.io/) + PostgreSQL (admin)
+- [Next.js](https://nextjs.org/) (App Router), React, TypeScript
+- [Supabase](https://supabase.com/) Auth + JS client (admin runtime); [Prisma](https://www.prisma.io/) for schema migrations only
 - **LLM (care sheets):** Anthropic Claude and/or Google Gemini via [`admin/src/lib/llm/`](admin/src/lib/llm/)
 - IBD guidelines: `admin/medical-doc/IBD_Clinical_Rulebook_Final2.pdf`
 - Optional: Google Drive API (admin)

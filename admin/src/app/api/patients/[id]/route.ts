@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { cookies } from 'next/headers';
 import { patientCreateDataFromBody } from '@/lib/patient-create-data';
 import { getErrorMessage } from '@/lib/get-error-message';
 import { parseJsonObjectBody } from '@/lib/parse-json-body';
+import { deletePatientById, updatePatientById } from '@/lib/patient-repository';
+import { getAppSession } from '@/lib/auth/session';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PUT(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   try {
-    const cookieStore = await cookies();
-    const userRole = cookieStore.get('userRole');
-    if (userRole?.value !== 'ADMIN') {
+    const session = await getAppSession();
+    if (session.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -26,10 +25,7 @@ export async function PUT(req: NextRequest, context: RouteContext): Promise<Next
 
     const payload = patientCreateDataFromBody(parsed.data);
 
-    const updatedPatient = await prisma.patient.update({
-      where: { id: patientId },
-      data: payload,
-    });
+    const updatedPatient = await updatePatientById(patientId, payload);
 
     return NextResponse.json({ success: true, patient: updatedPatient });
   } catch (error: unknown) {
@@ -43,9 +39,8 @@ export async function PUT(req: NextRequest, context: RouteContext): Promise<Next
 
 export async function DELETE(_req: NextRequest, context: RouteContext): Promise<NextResponse> {
   try {
-    const cookieStore = await cookies();
-    const userRole = cookieStore.get('userRole');
-    if (userRole?.value !== 'ADMIN') {
+    const session = await getAppSession();
+    if (session.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -55,9 +50,7 @@ export async function DELETE(_req: NextRequest, context: RouteContext): Promise<
       return NextResponse.json({ error: 'Invalid patient ID' }, { status: 400 });
     }
 
-    await prisma.patient.delete({
-      where: { id: patientId },
-    });
+    await deletePatientById(patientId);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

@@ -10,6 +10,18 @@ export const maxDuration = 300;
 
 const USER_FRIENDLY_502 =
   'Care sheet generation failed. Please try again or contact support.';
+const KP3P_STREAM_END_MARKER = '<div data-kp3p-end="true"></div>';
+const MAX_STREAM_OUTPUT_CHARS = 120_000;
+
+function toLlmConfigurationMessage(err: LLMConfigurationError): string {
+  if (err.message.includes('GEMINI_API_KEY')) {
+    return 'LLM is not configured: set GEMINI_API_KEY in admin/.env, then restart the server.';
+  }
+  if (err.message.includes('ANTHROPIC_API_KEY')) {
+    return 'LLM is not configured: set ANTHROPIC_API_KEY in admin/.env, then restart the server.';
+  }
+  return 'LLM is not configured correctly. Please update admin/.env and restart the server.';
+}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -120,10 +132,13 @@ export async function POST(req: NextRequest): Promise<Response> {
       if (callErr instanceof LLMConfigurationError) {
         logCaresheetFailure(
           patientIdForLog,
-          'missing_anthropic_api_key',
+          'llm_provider_not_configured',
           callErr,
         );
-        return NextResponse.json({ error: USER_FRIENDLY_502 }, { status: 502 });
+        return NextResponse.json(
+          { error: toLlmConfigurationMessage(callErr) },
+          { status: 500 },
+        );
       }
       if (isLikelyAbortError(callErr)) {
         logCaresheetFailure(patientIdForLog, 'claude_request_aborted', callErr);
@@ -149,15 +164,52 @@ export async function POST(req: NextRequest): Promise<Response> {
 
     const readable = new ReadableStream<Uint8Array>({
       async start(controller) {
+        let pending = '';
+        let endedByMarker = false;
         try {
           for await (const chunk of textStream) {
-            outputChars += chunk.length;
-            controller.enqueue(encoder.encode(chunk));
+            if (!chunk) continue;
+            pending += chunk;
+
+            const markerIdx = pending.indexOf(KP3P_STREAM_END_MARKER);
+            if (markerIdx !== -1) {
+              const beforeMarker = pending.slice(0, markerIdx);
+              if (beforeMarker) {
+                outputChars += beforeMarker.length;
+                controller.enqueue(encoder.encode(beforeMarker));
+              }
+              endedByMarker = true;
+              break;
+            }
+
+            const flushLen = Math.max(0, pending.length - (KP3P_STREAM_END_MARKER.length - 1));
+            if (flushLen > 0) {
+              const flushChunk = pending.slice(0, flushLen);
+              pending = pending.slice(flushLen);
+              outputChars += flushChunk.length;
+              controller.enqueue(encoder.encode(flushChunk));
+            }
+
+            if (outputChars >= MAX_STREAM_OUTPUT_CHARS) {
+              logCaresheetFailure(patientIdForLog, 'llm_stream_output_char_limit', {
+                maxChars: MAX_STREAM_OUTPUT_CHARS,
+                outputChars,
+              });
+              break;
+            }
           }
+
+          if (!endedByMarker && pending) {
+            outputChars += pending.length;
+            controller.enqueue(encoder.encode(pending));
+            pending = '';
+          }
+
           console.log('[KP3P] LLM output payload', {
             patientId: patientIdForLog,
             outputChars,
             estimatedOutputTokens: Math.ceil(outputChars / 4),
+            endedByMarker,
           });
           controller.close();
         } catch (err) {

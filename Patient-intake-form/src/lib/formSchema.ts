@@ -67,6 +67,80 @@ export const STEP_META = [
   { title: 'Medical Profile',             sub: 'Health information and vaccination history' },
 ];
 
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+/** Indian mobile: 10 digits, starting with 6, 7, 8, or 9. */
+export function isValidContactPhone(phone: string): boolean {
+  return /^[6-9]\d{9}$/.test(phone.trim());
+}
+
+export function normalizeContactPhoneInput(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 10);
+}
+
+/** Formats user input as dd/mm/yyyy while typing. */
+export function normalizeDateOfBirthInput(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+export function isValidDateOfBirthDdMmYyyy(value: string): boolean {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+  if (!match) return false;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+
+  if (month < 1 || month > 12) return false;
+  if (year < 1900 || year > new Date().getFullYear()) return false;
+
+  const date = new Date(year, month - 1, day);
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+}
+
+export function parseDateOfBirthDdMmYyyy(value: string): Date | null {
+  if (!isValidDateOfBirthDdMmYyyy(value)) return null;
+
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim())!;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+
+  return new Date(year, month - 1, day);
+}
+
+export function isDateOfBirthInFuture(value: string): boolean {
+  const dob = parseDateOfBirthDdMmYyyy(value);
+  if (!dob) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  dob.setHours(0, 0, 0, 0);
+  return dob > today;
+}
+
+export function calculateAgeFromDateOfBirth(value: string): number | null {
+  const dob = parseDateOfBirthDdMmYyyy(value);
+  if (!dob) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+  return Math.max(0, age);
+}
+
 const VAX_FIELDS: (keyof FormData)[] = [
   'influenza','covid19','pneumococcal','hepatitisB',
   'hepatitisA','hepatitisE','zoster','mmrVaricella','tetanusTdap',
@@ -100,9 +174,9 @@ export function validateStep(step: number, d: FormData): Record<string, string> 
     req('ageAtDiagnosis','Age at IBD diagnosis'); req('sex','Sex');
     req('smokingStatus','Smoking status'); req('contactPhone','Contact phone');
     req('placeOfLiving','Place of living'); req('referredBy','Referred by');
-    if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email))
+    if (d.email && !isValidEmail(d.email))
       err['email'] = 'Enter a valid email address';
-    if (d.contactPhone && !/^[6-9]\d{9}$/.test(d.contactPhone))
+    if (d.contactPhone && !isValidContactPhone(d.contactPhone))
       err['contactPhone'] = 'Phone number must be exactly 10 digits and start with 6, 7, 8, or 9';
       
     if (d.name && !/^[a-zA-Z\s.'-]+$/.test(d.name))
@@ -117,7 +191,9 @@ export function validateStep(step: number, d: FormData): Record<string, string> 
     if (d.mrn && !/^[a-zA-Z0-9-]+$/.test(d.mrn))
       err['mrn'] = 'Patient ID / MRN / ABHA ID can only contain letters, numbers, and hyphens';
 
-    if (d.dateOfBirth && d.dateOfBirth > todayStr)
+    if (d.dateOfBirth && !isValidDateOfBirthDdMmYyyy(d.dateOfBirth))
+      err['dateOfBirth'] = 'Enter date of birth as dd/mm/yyyy';
+    else if (d.dateOfBirth && isDateOfBirthInFuture(d.dateOfBirth))
       err['dateOfBirth'] = 'Date of birth cannot be a future date';
 
     if (d.currentAge && d.ageAtDiagnosis) {

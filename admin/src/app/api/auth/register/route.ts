@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { VALID_LOGIN_PASSWORD } from '@/lib/auth-credentials';
+import { ADMIN_LOGIN_EMAIL } from '@/lib/auth-credentials';
+import {
+  getSupabaseAuthClientForServer,
+  writeSupabaseSessionCookies,
+} from '@/lib/supabase/server-auth';
+import { upsertUserFromAuthIdentity } from '@/lib/user-repository';
 
 export const runtime = 'nodejs';
 
@@ -22,36 +26,46 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Name, Email, and password are required' }, { status: 400 });
     }
 
-    if (password !== VALID_LOGIN_PASSWORD) {
+    const role = email.toLowerCase() === ADMIN_LOGIN_EMAIL ? 'ADMIN' : 'PATIENT';
+
+    const supabase = getSupabaseAuthClientForServer();
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name, role },
+      },
+    });
+    if (signUpError) {
+      return NextResponse.json({ error: signUpError.message }, { status: 400 });
+    }
+
+    const { data: signInData, error: signInError } =
+      await supabase.auth.signInWithPassword({ email, password });
+    if (signInError || !signInData.user) {
       return NextResponse.json(
-        { error: 'Incorrect password. Please try again.' },
-        { status: 401 },
+        { error: signInError?.message ?? 'Could not create session after signup.' },
+        { status: 400 },
       );
     }
 
-    const role = email === 'admin@mygastro.ai' ? 'ADMIN' : 'PATIENT';
-
     const user = {
-      id: Math.floor(Math.random() * 1000000),
-      email,
+      id: signInData.user.id,
+      email: signInData.user.email ?? email,
       name,
       role,
     };
 
-    const cookieStore = await cookies();
-    cookieStore.set('userId', user.id.toString(), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/',
+    await upsertUserFromAuthIdentity({
+      authUserId: signInData.user.id,
+      email: user.email,
+      name,
+      role,
     });
 
-    cookieStore.set('userRole', user.role, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/',
-    });
+    if (signInData.session) {
+      await writeSupabaseSessionCookies(signInData.session);
+    }
 
     return NextResponse.json({ user });
   } catch (error) {

@@ -1,4 +1,8 @@
-import { FormData } from '@/lib/formSchema';
+import {
+  calculateAgeFromDateOfBirth,
+  FormData,
+  normalizeDateOfBirthInput,
+} from '@/lib/formSchema';
 
 interface Props {
   formData: FormData;
@@ -29,19 +33,12 @@ export default function Step1PatientInfo({ formData: d, onChange, errors: e }: P
   const showSmokingDetails = d.smokingStatus === 'Ex smoker' || d.smokingStatus === 'Current smoker';
 
   const handleDateOfBirthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const dobValue = e.target.value;
+    const dobValue = normalizeDateOfBirthInput(e.target.value);
     onChange('dateOfBirth', dobValue);
 
-    if (dobValue) {
-      const dob = new Date(dobValue);
-      const today = new Date();
-      let age = today.getFullYear() - dob.getFullYear();
-      const m = today.getMonth() - dob.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-        age--;
-      }
-      // Ensure age is not negative
-      onChange('currentAge', Math.max(0, age).toString());
+    const age = calculateAgeFromDateOfBirth(dobValue);
+    if (age !== null) {
+      onChange('currentAge', age.toString());
     }
   };
 
@@ -78,9 +75,17 @@ export default function Step1PatientInfo({ formData: d, onChange, errors: e }: P
 
       {/* Date of Birth */}
       <Fg id="dateOfBirth" label="Date of Birth" required error={e.dateOfBirth}>
-        <input id="dateOfBirth" type="date" className={`fi${e.dateOfBirth ? ' err' : ''}`}
-          max={new Date().toISOString().split('T')[0]}
-          value={d.dateOfBirth} onChange={handleDateOfBirthChange} />
+        <input
+          id="dateOfBirth"
+          type="text"
+          className={`fi${e.dateOfBirth ? ' err' : ''}`}
+          value={d.dateOfBirth}
+          onChange={handleDateOfBirthChange}
+          placeholder="dd/mm/yyyy"
+          inputMode="numeric"
+          autoComplete="bday"
+          maxLength={10}
+        />
       </Fg>
 
       {/* Current Age */}

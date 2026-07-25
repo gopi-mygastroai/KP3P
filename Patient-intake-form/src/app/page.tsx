@@ -2,13 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { INTAKE_SUBMITTED_KEY, PATIENT_ENTRY_KEY } from '@/lib/intakeSession';
+import {
+  isValidContactPhone,
+  isValidEmail,
+  normalizeContactPhoneInput,
+} from '@/lib/formSchema';
+import { INTAKE_SUBMITTED_KEY, PATIENT_ENTRY_KEY, type PatientEntry } from '@/lib/intakeSession';
 
 export default function Home() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   const [error, setError] = useState('');
+  const [isChecking, setIsChecking] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
 
   useEffect(() => {
@@ -16,23 +23,68 @@ export default function Home() {
     setAlreadySubmitted(sessionStorage.getItem(INTAKE_SUBMITTED_KEY) === '1');
   }, []);
 
-  const handleStart = (e: React.FormEvent) => {
+  const handleStart = async (e: React.FormEvent) => {
     e.preventDefault();
     if (typeof window !== 'undefined' && sessionStorage.getItem(INTAKE_SUBMITTED_KEY) === '1') {
       setError('You have already submitted your intake for this session. Close the browser or open a private window if you need to submit again.');
       return;
     }
-    if (!name.trim() || !email.trim()) {
-      setError('Both name and email are required.');
+
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedPhone = contactPhone.trim();
+
+    if (!trimmedName || !trimmedEmail || !trimmedPhone) {
+      setError('Full name, email, and phone number are required.');
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(trimmedEmail)) {
       setError('Please enter a valid email address.');
       return;
     }
+    if (!isValidContactPhone(trimmedPhone)) {
+      setError('Phone number must be exactly 10 digits and start with 6, 7, 8, or 9.');
+      return;
+    }
 
-    sessionStorage.setItem(PATIENT_ENTRY_KEY, JSON.stringify({ name: name.trim(), email: email.trim() }));
-    router.push('/form');
+    setError('');
+    setIsChecking(true);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://admin-xi-three-76.vercel.app';
+      const res = await fetch(`${apiUrl}/api/patients/check-duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail, contactPhone: trimmedPhone }),
+      });
+
+      let resData: { error?: string } = {};
+      try {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          resData = await res.json();
+        }
+      } catch {
+        // ignore parse failures
+      }
+
+      if (!res.ok) {
+        setError(resData.error || `Unable to start intake (error ${res.status}). Please try again.`);
+        return;
+      }
+
+      const entry: PatientEntry = {
+        name: trimmedName,
+        email: trimmedEmail,
+        contactPhone: trimmedPhone,
+      };
+      sessionStorage.setItem(PATIENT_ENTRY_KEY, JSON.stringify(entry));
+      router.push('/form');
+    } catch {
+      setError('Network error occurred. Please check your connection and try again.');
+    } finally {
+      setIsChecking(false);
+    }
   };
 
   return (
@@ -101,6 +153,7 @@ export default function Home() {
                   value={name}
                   onChange={e => setName(e.target.value)}
                   required
+                  autoComplete="name"
                 />
               </div>
 
@@ -114,6 +167,24 @@ export default function Home() {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
+                  autoComplete="email"
+                />
+              </div>
+
+              <div className="fg">
+                <label htmlFor="contactPhone">Phone Number<span className="req">*</span></label>
+                <input
+                  id="contactPhone"
+                  type="tel"
+                  className="fi"
+                  placeholder="e.g. 9876543210"
+                  value={contactPhone}
+                  onChange={e => setContactPhone(normalizeContactPhoneInput(e.target.value))}
+                  maxLength={10}
+                  inputMode="numeric"
+                  pattern="[6-9][0-9]{9}"
+                  required
+                  autoComplete="tel"
                 />
               </div>
 
@@ -121,9 +192,9 @@ export default function Home() {
                 type="submit"
                 className="btn-submit"
                 style={{ width: '100%', justifyContent: 'center', marginTop: 8, padding: '12px 24px' }}
-                disabled={alreadySubmitted}
+                disabled={alreadySubmitted || isChecking}
               >
-                Begin Intake Form
+                {isChecking ? 'Checking…' : 'Begin Intake Form'}
               </button>
             </form>
           </div>

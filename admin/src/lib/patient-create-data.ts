@@ -1,6 +1,6 @@
-/** Build Prisma Patient.create `data` from intake JSON (handles MultiStepForm pre-stringified arrays). */
+/** Build Patient create payload from intake JSON (handles MultiStepForm pre-stringified arrays). */
 
-import type { Prisma } from '@prisma/client';
+import type { PatientCreateInput } from '@/types/patient';
 import { composeMontrealClass, hasMontrealSelections, montrealFieldsForDiagnosis } from '@/lib/montreal-classification';
 import { normalizeSesCdScoring, parseSesCdScoring, serializeSesCdScoring } from '@/lib/ses-cd-scoring';
 import {
@@ -104,7 +104,7 @@ function dateMostRecentLabsFromBody(b: Record<string, unknown>): string {
   return typeof b.dateMostRecentLabs === 'string' ? b.dateMostRecentLabs : '';
 }
 
-export function patientCreateDataFromBody(body: Record<string, unknown>): Prisma.PatientCreateInput {
+export function patientCreateDataFromBody(body: Record<string, unknown>): PatientCreateInput {
   const b = body;
   const dateMostRecentLabs = dateMostRecentLabsFromBody(b);
   return {

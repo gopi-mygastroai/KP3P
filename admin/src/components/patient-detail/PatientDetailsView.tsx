@@ -581,7 +581,6 @@ export default function PatientDetailsView({ patient }: Props) {
               <div className="pr-sidebar-head">Record Info</div>
               {[
                 { label: 'Patient ID', value: `#${patient.id}` },
-                { label: 'User ID', value: `#${patient.userId}` },
                 { label: 'Submitted', value: createdDate },
                 { label: 'Referred By', value: patient.referredBy },
                 { label: 'Contact', value: patient.contactPhone },

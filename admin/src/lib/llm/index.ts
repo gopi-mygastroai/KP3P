@@ -1,6 +1,11 @@
 import claudeProvider from './claudeProvider';
 import geminiProvider from './geminiProvider';
-import type { CarePlanContext, CarePlanTextStream, LLMProvider } from './llmProvider';
+import {
+  LLMConfigurationError,
+  type CarePlanContext,
+  type CarePlanTextStream,
+  type LLMProvider,
+} from './llmProvider';
 
 export type { CarePlanTextStream, LLMProvider } from './llmProvider';
 
@@ -12,10 +17,10 @@ function resolveProviderName(): 'claude' | 'gemini' {
 function assertLlmEnvConfigured(): void {
   const name = resolveProviderName();
   if (name === 'gemini' && !process.env.GEMINI_API_KEY?.trim()) {
-    throw new Error('GEMINI_API_KEY is required when LLM_PROVIDER=gemini');
+    throw new LLMConfigurationError('GEMINI_API_KEY is required when LLM_PROVIDER=gemini');
   }
   if (name === 'claude' && !process.env.ANTHROPIC_API_KEY?.trim()) {
-    throw new Error('ANTHROPIC_API_KEY is required when LLM_PROVIDER=claude');
+    throw new LLMConfigurationError('ANTHROPIC_API_KEY is required when LLM_PROVIDER=claude');
   }
 }
 

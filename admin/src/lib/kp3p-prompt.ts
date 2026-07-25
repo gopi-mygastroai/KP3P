@@ -134,6 +134,7 @@ RULES:
 14. Any pending or blank infection screening result = "DO NOT START IMMUNOSUPPRESSION" flag in clinician record.
 15. Complete Pregnancy &amp; Family Planning section for ALL patients; include applicable flags in both Document 1 and Document 2.
 16. Never recommend a drug in a mechanism class that previously failed (primary NR) without documented rationale.
+17. After finishing Document 3, append exactly this final marker on the last line and stop output: <div data-kp3p-end="true"></div>
 
 ---BEGIN TEMPLATE---
 

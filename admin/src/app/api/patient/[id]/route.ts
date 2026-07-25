@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { cookies } from 'next/headers';
 import { patientCreateDataFromBody } from '@/lib/patient-create-data';
 import { getErrorMessage } from '@/lib/get-error-message';
 import { parseJsonObjectBody } from '@/lib/parse-json-body';
+import { updatePatientById } from '@/lib/patient-repository';
+import { getAppSession } from '@/lib/auth/session';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PUT(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   try {
-    const cookieStore = await cookies();
-    const userRole = cookieStore.get('userRole');
-
-    if (userRole?.value !== 'ADMIN') {
+    const session = await getAppSession();
+    if (session.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -27,10 +25,7 @@ export async function PUT(request: NextRequest, context: RouteContext): Promise<
 
     const payload = patientCreateDataFromBody(parsed.data);
 
-    const updatedPatient = await prisma.patient.update({
-      where: { id: patientId },
-      data: payload,
-    });
+    const updatedPatient = await updatePatientById(patientId, payload);
 
     return NextResponse.json(updatedPatient);
   } catch (error: unknown) {

@@ -6,43 +6,57 @@ ALTER TABLE "Patient" ADD COLUMN IF NOT EXISTS "partialMayoScoring" TEXT NOT NUL
 ALTER TABLE "Patient" ADD COLUMN IF NOT EXISTS "radiologyInvestigations" TEXT NOT NULL DEFAULT '{}';
 ALTER TABLE "Patient" ADD COLUMN IF NOT EXISTS "infectionScreening" TEXT NOT NULL DEFAULT '{"sets":[]}';
 
--- Migrate legacy flat infection-screening columns into JSON sets when still empty.
-UPDATE "Patient"
-SET "infectionScreening" = json_build_object(
-  'sets',
-  json_build_array(
-    json_build_object(
-      'screeningDate', '',
-      'tbQuantiFERONGold', CASE
-        WHEN COALESCE("tbScreening", '') = '' THEN ''
-        WHEN "tbScreening" = 'Not done' THEN 'Not done'
-        WHEN "tbScreening" = 'Done - Negative (IGRA or TST)' THEN 'Done - Negative'
-        WHEN "tbScreening" = 'Done - Positive, treated' THEN 'Done - Positive, treated'
-        WHEN "tbScreening" = 'Done - Positive, not treated' THEN 'Done - Positive, not treated'
-        WHEN "tbScreening" = 'Unknown' THEN 'Unknown'
-        WHEN "tbScreening" = 'Negative' THEN 'Done - Negative'
-        WHEN "tbScreening" = 'Positive' THEN 'Done - Positive, not treated'
-        ELSE "tbScreening"
-      END,
-      'tbChestXRay', '',
-      'tbCtChest', '',
-      'hepBSurfaceAg', COALESCE("hepBSurfaceAg", ''),
-      'hepBSurfaceAb', COALESCE("hepBSurfaceAb", ''),
-      'hepBCoreAb', COALESCE("hepBCoreAb", ''),
-      'antiHcv', COALESCE("antiHcv", ''),
-      'antiHiv', COALESCE("antiHiv", '')
-    )
-  )
-)::text
-WHERE COALESCE("infectionScreening", '{"sets":[]}') IN ('', '{"sets":[]}')
-  AND (
-    COALESCE("tbScreening", '') <> ''
-    OR COALESCE("hepBSurfaceAg", '') <> ''
-    OR COALESCE("hepBSurfaceAb", '') <> ''
-    OR COALESCE("hepBCoreAb", '') <> ''
-    OR COALESCE("antiHcv", '') <> ''
-    OR COALESCE("antiHiv", '') <> ''
-  );
+-- Migrate legacy flat infection-screening columns into JSON sets when still present.
+-- Skipped on fresh DBs where earlier migrations already dropped legacy columns.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'Patient'
+      AND column_name = 'tbScreening'
+  ) THEN
+    EXECUTE $migration$
+      UPDATE "Patient"
+      SET "infectionScreening" = json_build_object(
+        'sets',
+        json_build_array(
+          json_build_object(
+            'screeningDate', '',
+            'tbQuantiFERONGold', CASE
+              WHEN COALESCE("tbScreening", '') = '' THEN ''
+              WHEN "tbScreening" = 'Not done' THEN 'Not done'
+              WHEN "tbScreening" = 'Done - Negative (IGRA or TST)' THEN 'Done - Negative'
+              WHEN "tbScreening" = 'Done - Positive, treated' THEN 'Done - Positive, treated'
+              WHEN "tbScreening" = 'Done - Positive, not treated' THEN 'Done - Positive, not treated'
+              WHEN "tbScreening" = 'Unknown' THEN 'Unknown'
+              WHEN "tbScreening" = 'Negative' THEN 'Done - Negative'
+              WHEN "tbScreening" = 'Positive' THEN 'Done - Positive, not treated'
+              ELSE "tbScreening"
+            END,
+            'tbChestXRay', '',
+            'tbCtChest', '',
+            'hepBSurfaceAg', COALESCE("hepBSurfaceAg", ''),
+            'hepBSurfaceAb', COALESCE("hepBSurfaceAb", ''),
+            'hepBCoreAb', COALESCE("hepBCoreAb", ''),
+            'antiHcv', COALESCE("antiHcv", ''),
+            'antiHiv', COALESCE("antiHiv", '')
+          )
+        )
+      )::text
+      WHERE COALESCE("infectionScreening", '{"sets":[]}') IN ('', '{"sets":[]}')
+        AND (
+          COALESCE("tbScreening", '') <> ''
+          OR COALESCE("hepBSurfaceAg", '') <> ''
+          OR COALESCE("hepBSurfaceAb", '') <> ''
+          OR COALESCE("hepBCoreAb", '') <> ''
+          OR COALESCE("antiHcv", '') <> ''
+          OR COALESCE("antiHiv", '') <> ''
+        )
+    $migration$;
+  END IF;
+END $$;
 
 ALTER TABLE "Patient" DROP COLUMN IF EXISTS "tbScreening";
 ALTER TABLE "Patient" DROP COLUMN IF EXISTS "tbQuantiFERONGold";

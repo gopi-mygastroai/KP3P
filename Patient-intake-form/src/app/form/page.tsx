@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormData, initialFormData, STEP_META, validateStep } from '@/lib/formSchema';
-import { INTAKE_SUBMITTED_KEY, PATIENT_ENTRY_KEY } from '@/lib/intakeSession';
+import { INTAKE_SUBMITTED_KEY, PATIENT_ENTRY_KEY, type PatientEntry } from '@/lib/intakeSession';
 import Step1PatientInfo from '@/components/steps/Step1PatientInfo';
 import Step2DiseaseChar from '@/components/steps/Step2DiseaseChar';
 
@@ -39,11 +39,12 @@ export default function FormPage() {
     const saved = sessionStorage.getItem(PATIENT_ENTRY_KEY);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(saved) as Partial<PatientEntry>;
         setData(prev => ({
           ...prev,
           name: parsed.name || prev.name,
           email: parsed.email || prev.email,
+          contactPhone: parsed.contactPhone || prev.contactPhone,
         }));
       } catch (err) {
         console.error('Failed to parse patient_entry', err);

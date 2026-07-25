@@ -1,8 +1,8 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import AuthForm from './AuthForm';
+import { getAppSession } from '@/lib/auth/session';
 
 export const metadata = {
   title: 'MyGastro.Ai - Patient Intake',
@@ -10,12 +10,10 @@ export const metadata = {
 };
 
 export default async function Home() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get('userId');
-  const userRole = cookieStore.get('userRole');
+  const session = await getAppSession();
 
-  if (userId) {
-    if (userRole?.value === 'ADMIN') {
+  if (session.isAuthenticated) {
+    if (session.role === 'ADMIN') {
       redirect('/admin');
     } else {
       redirect('/form');

@@ -1,14 +1,13 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import MultiStepForm from './MultiStepForm';
 import LogoutButton from '../admin/LogoutButton';
+import { getAppSession } from '@/lib/auth/session';
 
 export default async function FormPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get('userId');
+  const session = await getAppSession();
 
-  if (!userId) {
+  if (!session.isAuthenticated) {
     redirect('/');
   }
 

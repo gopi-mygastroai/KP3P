@@ -1,24 +1,19 @@
-import { prisma } from '@/lib/prisma';
 import { formatSmokingSummary } from '@/lib/smoking';
 import PatientActions from '../../../../components/PatientActions';
 import PatientDetailsShell from '@/components/patient-detail/PatientDetailsShell';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { getPatientWithUserById } from '@/lib/patient-repository';
+import { getAppSession } from '@/lib/auth/session';
 
 export default async function PatientDetailsPage({ params }: { params: Promise<{ id: string }> }) {
-  const cookieStore = await cookies();
-  const userRole = cookieStore.get('userRole');
-
-  if (userRole?.value !== 'ADMIN') {
+  const session = await getAppSession();
+  if (session.role !== 'ADMIN') {
     redirect('/');
   }
 
   const { id } = await params;
-  const patient = await prisma.patient.findUnique({
-    where: { id: parseInt(id, 10) },
-    include: { user: true },
-  });
+  const patient = await getPatientWithUserById(parseInt(id, 10));
 
   if (!patient) {
     return (

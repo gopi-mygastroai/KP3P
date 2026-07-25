@@ -10,21 +10,24 @@ datasource db {
 
 
 model User {
-id        Int      @id @default(autoincrement())
-email     String   @unique
-name      String
-role      String   @default("PATIENT")
-password  String
-createdAt DateTime @default(now())
-updatedAt DateTime @updatedAt
+id         Int      @id @default(autoincrement())
+email      String   @unique
+name       String
+role       String   @default("PATIENT")
+password   String
+phone      String?  @unique
+authUserId String?  @unique @db.Uuid
+createdAt  DateTime @default(now())
+updatedAt  DateTime @updatedAt
 
 patients  Patient[]
 }
 
 model Patient {
-id        Int      @id @default(autoincrement())
-userId    Int?
-user      User?    @relation(fields: [userId], references: [id])
+id         Int      @id @default(autoincrement())
+userId     Int?
+user       User?    @relation(fields: [userId], references: [id])
+authUserId String?  @db.Uuid
 
 name             String
 email            String @default("")

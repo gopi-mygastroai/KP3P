@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { ADMIN_LOGIN_EMAIL, VALID_LOGIN_PASSWORD } from '@/lib/auth-credentials';
+import { ADMIN_LOGIN_EMAIL } from '@/lib/auth-credentials';
+import {
+  getSupabaseAuthClientForServer,
+  writeSupabaseSessionCookies,
+} from '@/lib/supabase/server-auth';
+import { upsertUserFromAuthIdentity } from '@/lib/user-repository';
 
 export const runtime = 'nodejs';
 
@@ -25,34 +29,42 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Invalid username.' }, { status: 401 });
     }
 
-    if (password !== VALID_LOGIN_PASSWORD) {
+    const supabase = getSupabaseAuthClientForServer();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error || !data.user) {
       return NextResponse.json(
         { error: 'Incorrect password. Please try again.' },
         { status: 401 },
       );
     }
 
+    const role =
+      (data.user.email ?? '').toLowerCase() === ADMIN_LOGIN_EMAIL
+        ? ('ADMIN' as const)
+        : ('PATIENT' as const);
     const user = {
-      id: Math.floor(Math.random() * 1000000),
-      email: ADMIN_LOGIN_EMAIL,
-      name: 'admin',
-      role: 'ADMIN' as const,
+      id: data.user.id,
+      email: data.user.email ?? email,
+      name:
+        typeof data.user.user_metadata?.name === 'string'
+          ? data.user.user_metadata.name
+          : 'admin',
+      role,
     };
 
-    const cookieStore = await cookies();
-    cookieStore.set('userId', user.id.toString(), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/',
+    await upsertUserFromAuthIdentity({
+      authUserId: data.user.id,
+      email: user.email,
+      name: user.name,
+      role,
     });
 
-    cookieStore.set('userRole', user.role, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/',
-    });
+    if (data.session) {
+      await writeSupabaseSessionCookies(data.session);
+    }
 
     return NextResponse.json({ user });
   } catch (error) {

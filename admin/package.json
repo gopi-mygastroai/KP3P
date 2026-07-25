@@ -3,9 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "postinstall": "prisma generate",
     "dev": "next dev --webpack",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test:openrouter": "node scripts/test-openrouter.mjs",
@@ -14,12 +13,13 @@
     "test:llm": "ts-node -P tsconfig.scripts.json scripts/testLLM.ts",
     "count:llm-tokens": "ts-node -P tsconfig.scripts.json scripts/countLLMPayloadTokens.ts",
     "export:llm-prompt": "ts-node -P tsconfig.scripts.json scripts/exportLLMPromptToMd.ts",
-    "seed:rulebook-text": "ts-node -P tsconfig.scripts.json scripts/seedRulebookText.ts"
+    "seed:rulebook-text": "ts-node -P tsconfig.scripts.json scripts/seedRulebookText.ts",
+    "create:admin-user": "node scripts/create-admin-user.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
     "@google/generative-ai": "^0.24.1",
-    "@prisma/client": "5.22.0",
+    "@supabase/supabase-js": "^2.54.0",
     "docx": "^9.6.1",
     "file-saver": "^2.0.5",
     "googleapis": "^171.4.0",
@@ -33,6 +33,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@prisma/client": "5.22.0",
     "@tailwindcss/postcss": "^4",
     "@types/file-saver": "^2.0.7",
     "@types/node": "^25.6.0",
