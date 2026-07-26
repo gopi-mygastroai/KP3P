@@ -40,9 +40,22 @@ Intake calls admin endpoints such as `POST ${NEXT_PUBLIC_API_URL}/api/patients` 
 | `npm run build` | Production build |
 | `npm run start` | Production server |
 
-## Deploy on Vercel
+## Deploy on Google Cloud Run
 
-Deploy as a separate Vercel project with **Root Directory** `Patient-intake-form`. Set `NEXT_PUBLIC_API_URL` to your production admin URL.
+Deploy as a Cloud Run service in project **`kp3p-prod`** (region `asia-south1`). Auto-deploy trigger: `deploy-kp3p-intake` (config: [`cloudbuild.yaml`](cloudbuild.yaml)).
+
+| Build-time variable | Production value |
+|---------------------|------------------|
+| `NEXT_PUBLIC_API_URL` | `https://www.gastroai.in` |
+
+One-time setup (both apps): from repo root run [`../infra/setup-kp3p-prod.sh`](../infra/setup-kp3p-prod.sh).
+
+Manual deploy from repo root:
+
+```bash
+gcloud builds submit --config=Patient-intake-form/cloudbuild.yaml \
+  --substitutions=_PROJECT_ID=kp3p-prod,_ADMIN_PUBLIC_URL=https://www.gastroai.in
+```
 
 ## Project layout (high level)
 

@@ -143,15 +143,28 @@ If save returns 500 with `updatedAt` or RLS errors, confirm migrations and RLS S
 ### Prerequisites
 
 - Google Cloud CLI installed and authenticated (`gcloud auth login`)
-- Docker Desktop installed and running
-- Google Cloud project: `kp3p-admin-prod`
+- Docker Desktop installed and running (optional, for local image tests)
+- Google Cloud project: **`kp3p-prod`**
 
-### First time setup (already done — for reference)
+### First-time setup (new project)
+
+From the **repo root**:
 
 ```bash
-gcloud config set project kp3p-admin-prod
-gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com
-gcloud artifacts repositories create kp3p-repo --repository-format=docker --location=asia-south1
+gcloud auth login
+gcloud config set project kp3p-prod
+./infra/verify-kp3p-prod.sh    # optional pre-flight
+./infra/setup-kp3p-prod.sh     # APIs, Artifact Registry, secrets, deploy, triggers
+```
+
+The setup script copies secrets from `kp3p-admin-prod` when accessible, bootstraps both Cloud Run services, and creates GitHub auto-deploy triggers.
+
+Override public URLs if needed:
+
+```bash
+ADMIN_PUBLIC_URL=https://www.gastroai.in \
+INTAKE_PUBLIC_URL=https://intake.gastroai.in \
+./infra/setup-kp3p-prod.sh
 ```
 
 ### Secrets (stored in Google Secret Manager)
@@ -169,20 +182,18 @@ gcloud artifacts repositories create kp3p-repo --repository-format=docker --loca
 
 ### Manual deploy
 
+From repo root:
+
 ```bash
-cd admin
-gcloud builds submit --tag asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:latest .
-gcloud run deploy kp3p-admin \
-  --image asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:latest \
-  --region asia-south1 \
-  --project kp3p-admin-prod
+gcloud builds submit --config=admin/cloudbuild.yaml \
+  --substitutions=_PROJECT_ID=kp3p-prod,_INTAKE_PUBLIC_URL=https://intake.gastroai.in
 ```
 
 ### Auto deploy
 
-Every push to the `main` branch triggers Cloud Build automatically via [`cloudbuild.yaml`](cloudbuild.yaml).
+Every push to `main` that changes files under `admin/` triggers Cloud Build via [`cloudbuild.yaml`](cloudbuild.yaml) (trigger: `deploy-kp3p-admin` in project `kp3p-prod`).
 
-Monitor builds at: [Cloud Build console](https://console.cloud.google.com/cloud-build/builds?project=kp3p-admin-prod)
+Monitor builds at: [Cloud Build console](https://console.cloud.google.com/cloud-build/builds?project=kp3p-prod)
 
 ### Run DB migrations (run after first deploy or schema changes)
 
@@ -192,8 +203,8 @@ gcloud run jobs execute migrate-db --region asia-south1 --wait
 
 ### Production URLs
 
-- Cloud Run: [https://kp3p-admin-452734733972.asia-south1.run.app](https://kp3p-admin-452734733972.asia-south1.run.app)
-- Custom domain: [https://www.gastroai.in](https://www.gastroai.in)
+- Admin custom domain: [https://www.gastroai.in](https://www.gastroai.in)
+- Intake (suggested): `https://intake.gastroai.in` — set `NEXT_PUBLIC_INTAKE_APP_URL` / Cloud Build substitution `_INTAKE_PUBLIC_URL` to match
 
 ## Docker
 

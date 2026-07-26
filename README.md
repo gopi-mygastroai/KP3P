@@ -121,11 +121,12 @@ See [`admin/package.json`](admin/package.json) for additional script entries (Op
 
 ### Admin app — Google Cloud Run
 
-- Hosted on Google Cloud Run (project: `kp3p-admin-prod`, region: `asia-south1`)
-- Production URL: [https://kp3p-admin-452734733972.asia-south1.run.app](https://kp3p-admin-452734733972.asia-south1.run.app)
-- Custom domain: [https://www.gastroai.in](https://www.gastroai.in) (via Cloudflare proxy)
-- Docker image stored in Artifact Registry: `asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin`
-- Auto-deploys on every push to `main` branch via Cloud Build trigger (config: [`admin/cloudbuild.yaml`](admin/cloudbuild.yaml))
+- Hosted on Google Cloud Run (project: `kp3p-prod`, region: `asia-south1`)
+- Production URL: custom domain [https://www.gastroai.in](https://www.gastroai.in) (via Cloudflare proxy)
+- Docker image: `asia-south1-docker.pkg.dev/kp3p-prod/kp3p-repo/kp3p-admin`
+- Auto-deploys on push to `main` when files under `admin/` change (config: [`admin/cloudbuild.yaml`](admin/cloudbuild.yaml))
+- One-time setup and migration from `kp3p-admin-prod`: [`infra/setup-kp3p-prod.sh`](infra/setup-kp3p-prod.sh)
+- Pre-flight checks: [`infra/verify-kp3p-prod.sh`](infra/verify-kp3p-prod.sh)
 - Secrets: include `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, plus LLM keys. `POSTGRES_*` needed for migration jobs only.
 - Container timeout: 60 minutes (solves LLM generation timeout)
 
@@ -133,23 +134,24 @@ To manually deploy:
 
 ```bash
 cd admin
-gcloud builds submit --tag asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:latest .
-gcloud run deploy kp3p-admin \
-  --image asia-south1-docker.pkg.dev/kp3p-admin-prod/kp3p-repo/kp3p-admin:latest \
-  --region asia-south1 \
-  --project kp3p-admin-prod
+gcloud builds submit --config=cloudbuild.yaml .. \
+  --substitutions=_PROJECT_ID=kp3p-prod,_INTAKE_PUBLIC_URL=https://intake.gastroai.in
 ```
 
-### Patient intake app — Vercel
+### Patient intake app — Google Cloud Run
 
-| Setting | Value |
-|---------|-------|
-| Root Directory | `Patient-intake-form` |
-| `NEXT_PUBLIC_API_URL` | `https://www.gastroai.in` |
+- Hosted on Google Cloud Run (project: `kp3p-prod`, region: `asia-south1`)
+- Suggested custom domain: `https://intake.gastroai.in` (configure in Cloudflare)
+- Docker image: `asia-south1-docker.pkg.dev/kp3p-prod/kp3p-repo/kp3p-intake`
+- Auto-deploys on push to `main` when files under `Patient-intake-form/` change (config: [`Patient-intake-form/cloudbuild.yaml`](Patient-intake-form/cloudbuild.yaml))
+
+| Build-time variable | Value |
+|---------------------|-------|
+| `NEXT_PUBLIC_API_URL` | `https://www.gastroai.in` (admin API base URL) |
 
 ## Infrastructure
 
-- **Google Cloud Project:** `kp3p-admin-prod`
+- **Google Cloud Project:** `kp3p-prod` (migrated from `kp3p-admin-prod`)
 - **Region:** `asia-south1` (Mumbai)
 - **Services used:** Cloud Run, Artifact Registry, Cloud Build, Secret Manager
 - **Domain:** `gastroai.in` managed via Cloudflare (proxied) → Cloud Run
