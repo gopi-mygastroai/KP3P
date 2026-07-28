@@ -23,12 +23,26 @@ cd "$REPO_ROOT"
 echo "==> Project: $PROJECT_ID | Region: $REGION"
 gcloud config set project "$PROJECT_ID"
 
+if gcloud auth application-default print-access-token &>/dev/null; then
+  echo "==> Aligning Application Default Credentials quota project..."
+  if ! gcloud auth application-default set-quota-project "$PROJECT_ID" --quiet 2>/dev/null; then
+    echo "    ADC quota project not updated. If you see invalid_grant, run:"
+    echo "      gcloud auth application-default login"
+    echo "      gcloud auth application-default set-quota-project $PROJECT_ID"
+  fi
+else
+  echo "==> Application Default Credentials missing or expired."
+  echo "    Run: gcloud auth application-default login"
+  echo "    Then: gcloud auth application-default set-quota-project $PROJECT_ID"
+fi
+
 echo "==> Enabling required APIs..."
 gcloud services enable \
   run.googleapis.com \
   artifactregistry.googleapis.com \
   cloudbuild.googleapis.com \
   secretmanager.googleapis.com \
+  storage.googleapis.com \
   iam.googleapis.com \
   --project="$PROJECT_ID"
 
@@ -46,12 +60,14 @@ PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(project
 CLOUD_BUILD_SA="${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 
-echo "==> Granting IAM to Cloud Build service account..."
-for role in roles/run.admin roles/artifactregistry.writer roles/iam.serviceAccountUser roles/secretmanager.secretAccessor; do
-  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-    --member="serviceAccount:${CLOUD_BUILD_SA}" \
-    --role="$role" \
-    --quiet >/dev/null
+echo "==> Granting IAM to Cloud Build and default compute service accounts..."
+for sa in "${CLOUD_BUILD_SA}" "${COMPUTE_SA}"; do
+  for role in roles/storage.admin roles/artifactregistry.writer roles/run.admin roles/iam.serviceAccountUser roles/secretmanager.secretAccessor roles/logging.logWriter; do
+    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+      --member="serviceAccount:${sa}" \
+      --role="$role" \
+      --quiet >/dev/null
+  done
 done
 
 copy_secret_from_old() {
@@ -79,6 +95,7 @@ ADMIN_SECRETS=(
   GEMINI_API_KEY
   POSTGRES_PRISMA_URL
   POSTGRES_URL_NON_POOLING
+  LLM_PROVIDER
   GDRIVE_CLIENT_ID
   GDRIVE_CLIENT_SECRET
   GDRIVE_REFRESH_TOKEN
@@ -87,6 +104,15 @@ ADMIN_SECRETS=(
 for s in "${ADMIN_SECRETS[@]}"; do
   copy_secret_from_old "$s" || true
 done
+
+ENV_PROD="${REPO_ROOT}/admin/.env.prod"
+if [[ -f "$ENV_PROD" ]]; then
+  echo "==> Seeding missing secrets from admin/.env.prod..."
+  PROJECT_ID="$PROJECT_ID" "$REPO_ROOT/infra/seed-secrets-from-env.sh" "$ENV_PROD"
+elif ! gcloud secrets describe SUPABASE_URL --project="$PROJECT_ID" &>/dev/null; then
+  echo "WARNING: SUPABASE_URL not in Secret Manager and admin/.env.prod not found."
+  echo "         Create admin/.env.prod or add secrets manually before Cloud Run will work."
+fi
 
 echo "==> Ensuring LLM_PROVIDER secret exists..."
 if ! gcloud secrets describe LLM_PROVIDER --project="$PROJECT_ID" &>/dev/null; then
@@ -113,12 +139,27 @@ gcloud builds submit \
   --project="$PROJECT_ID"
 
 echo "==> Configuring Cloud Run services (secrets, timeout, public access)..."
-ADMIN_SECRET_BINDINGS="SUPABASE_URL=SUPABASE_URL:latest,SUPABASE_ANON_KEY=SUPABASE_ANON_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,POSTGRES_PRISMA_URL=POSTGRES_PRISMA_URL:latest,POSTGRES_URL_NON_POOLING=POSTGRES_URL_NON_POOLING:latest,LLM_PROVIDER=LLM_PROVIDER:latest"
-for opt in GDRIVE_CLIENT_ID GDRIVE_CLIENT_SECRET GDRIVE_REFRESH_TOKEN GDRIVE_FOLDER_ID; do
-  if gcloud secrets describe "$opt" --project="$PROJECT_ID" &>/dev/null; then
-    ADMIN_SECRET_BINDINGS+=",${opt}=${opt}:latest"
+ADMIN_SECRET_BINDINGS=""
+bind_secret_if_exists() {
+  local name="$1"
+  if gcloud secrets describe "$name" --project="$PROJECT_ID" &>/dev/null; then
+    if [[ -n "$ADMIN_SECRET_BINDINGS" ]]; then
+      ADMIN_SECRET_BINDINGS+=","
+    fi
+    ADMIN_SECRET_BINDINGS+="${name}=${name}:latest"
+  else
+    echo "    skip secret binding $name (not in Secret Manager)"
   fi
+}
+
+for s in SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY ANTHROPIC_API_KEY GEMINI_API_KEY POSTGRES_PRISMA_URL POSTGRES_URL_NON_POOLING LLM_PROVIDER GDRIVE_CLIENT_ID GDRIVE_CLIENT_SECRET GDRIVE_REFRESH_TOKEN GDRIVE_FOLDER_ID; do
+  bind_secret_if_exists "$s"
 done
+
+if [[ -z "$ADMIN_SECRET_BINDINGS" ]]; then
+  echo "ERROR: No secrets available to bind to $ADMIN_SERVICE. Add secrets and re-run."
+  exit 1
+fi
 
 gcloud run services update "$ADMIN_SERVICE" \
   --region="$REGION" \
@@ -129,64 +170,38 @@ gcloud run services update "$ADMIN_SERVICE" \
   --cpu=2 \
   --quiet
 
-gcloud run services update "$ADMIN_SERVICE" \
-  --region="$REGION" \
-  --project="$PROJECT_ID" \
-  --allow-unauthenticated \
-  --quiet
+allow_public_invoker() {
+  local service="$1"
+  gcloud run services add-iam-policy-binding "$service" \
+    --region="$REGION" \
+    --project="$PROJECT_ID" \
+    --member="allUsers" \
+    --role="roles/run.invoker" \
+    --quiet >/dev/null 2>&1 || true
+}
 
-gcloud run services update "$INTAKE_SERVICE" \
-  --region="$REGION" \
-  --project="$PROJECT_ID" \
-  --allow-unauthenticated \
-  --quiet
+allow_public_invoker "$ADMIN_SERVICE"
+allow_public_invoker "$INTAKE_SERVICE"
 
 ADMIN_URL="$(gcloud run services describe "$ADMIN_SERVICE" --region="$REGION" --project="$PROJECT_ID" --format='value(status.url)')"
 INTAKE_URL="$(gcloud run services describe "$INTAKE_SERVICE" --region="$REGION" --project="$PROJECT_ID" --format='value(status.url)')"
 echo "    Admin URL:  $ADMIN_URL"
 echo "    Intake URL: $INTAKE_URL"
 
-echo "==> Creating Cloud Build triggers (requires GitHub repo connected in Cloud Console)..."
-create_trigger() {
-  local name="$1"
-  local config="$2"
-  local included="$3"
-  local subs="$4"
-
-  if gcloud builds triggers describe "$name" --project="$PROJECT_ID" &>/dev/null; then
-    echo "    trigger $name already exists — updating"
-    gcloud builds triggers update github "$name" \
-      --repo-name="$GITHUB_REPO" \
-      --repo-owner="$GITHUB_OWNER" \
-      --branch-pattern="$BRANCH" \
-      --build-config="$config" \
-      --included-files="$included" \
-      --substitutions="$subs" \
-      --project="$PROJECT_ID"
-  else
-    gcloud builds triggers create github \
-      --name="$name" \
-      --repo-name="$GITHUB_REPO" \
-      --repo-owner="$GITHUB_OWNER" \
-      --branch-pattern="$BRANCH" \
-      --build-config="$config" \
-      --included-files="$included" \
-      --substitutions="$subs" \
-      --project="$PROJECT_ID"
-  fi
-}
-
-create_trigger "deploy-kp3p-admin" "admin/cloudbuild.yaml" "admin/**" \
-  "_PROJECT_ID=${PROJECT_ID},_REGION=${REGION},_ARTIFACT_REPO=${ARTIFACT_REPO},_SERVICE=${ADMIN_SERVICE},_INTAKE_PUBLIC_URL=${INTAKE_PUBLIC_URL}"
-
-create_trigger "deploy-kp3p-intake" "Patient-intake-form/cloudbuild.yaml" "Patient-intake-form/**" \
-  "_PROJECT_ID=${PROJECT_ID},_REGION=${REGION},_ARTIFACT_REPO=${ARTIFACT_REPO},_SERVICE=${INTAKE_SERVICE},_ADMIN_PUBLIC_URL=${ADMIN_PUBLIC_URL}"
+echo "==> Creating Cloud Build triggers (requires GitHub repo connected)..."
+if ! gcloud builds triggers create github --help &>/dev/null; then
+  echo "    WARNING: gcloud builds triggers unavailable"
+elif gcloud builds triggers list --project="$PROJECT_ID" --format="value(name)" 2>/dev/null | grep -q deploy-kp3p-admin; then
+  echo "    triggers already exist"
+else
+  echo "    GitHub not connected yet — run: ./infra/connect-github-triggers.sh"
+fi
 
 echo ""
 echo "==> Setup complete."
 echo "Next steps:"
 echo "  1. Point Cloudflare DNS: www.gastroai.in -> $ADMIN_URL (if not already)"
 echo "  2. Add intake subdomain (e.g. intake.gastroai.in) -> $INTAKE_URL"
-echo "  3. If GitHub trigger creation failed, connect repo: Cloud Console -> Cloud Build -> Repositories"
+echo "  3. Connect GitHub for auto-deploy: ./infra/connect-github-triggers.sh"
 echo "  4. Disable/delete old triggers in project $OLD_PROJECT_ID when cutover is verified"
 echo "  5. Run DB migrations if needed: gcloud run jobs execute migrate-db --region=$REGION --project=$PROJECT_ID --wait"

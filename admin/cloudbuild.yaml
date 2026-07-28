@@ -40,6 +40,7 @@ steps:
       - '--timeout=3600'
       - '--memory=2Gi'
       - '--cpu=2'
+      - '--allow-unauthenticated'
       - '--quiet'
 
 options:

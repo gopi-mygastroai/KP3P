@@ -48,12 +48,13 @@ for f in \
 done
 
 echo "4. APIs (target project)"
-REQUIRED_APIS=(run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com)
+ENABLED_APIS="$(gcloud services list --project="$PROJECT_ID" --enabled --format="value(config.name)" 2>/dev/null || true)"
+REQUIRED_APIS=(run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com storage.googleapis.com)
 for api in "${REQUIRED_APIS[@]}"; do
-  if gcloud services list --project="$PROJECT_ID" --enabled --filter="config.name:$api" --format="value(config.name)" 2>/dev/null | grep -q "$api"; then
+  if echo "$ENABLED_APIS" | grep -Fx "$api" >/dev/null; then
     ok "$api enabled"
   else
-    note "$api not enabled yet (setup script will enable)"
+    note "$api not enabled yet (run ./infra/setup-kp3p-prod.sh)"
   fi
 done
 
@@ -69,7 +70,7 @@ for s in SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY GEMINI_API_KEY
   if gcloud secrets describe "$s" --project="$PROJECT_ID" &>/dev/null; then
     ok "Secret $s"
   else
-    note "Secret $s missing (copy from $OLD_PROJECT_ID or create manually)"
+    note "Secret $s missing — run ./infra/seed-secrets-from-env.sh or setup script"
   fi
 done
 
@@ -85,7 +86,7 @@ done
 
 echo "8. Cloud Build triggers"
 for trg in deploy-kp3p-admin deploy-kp3p-intake; do
-  if gcloud builds triggers describe "$trg" --project="$PROJECT_ID" &>/dev/null; then
+  if gcloud builds triggers describe "$trg" --region="$REGION" --project="$PROJECT_ID" &>/dev/null; then
     ok "Trigger $trg"
   else
     note "Trigger $trg not created yet"
@@ -93,10 +94,11 @@ for trg in deploy-kp3p-admin deploy-kp3p-intake; do
 done
 
 echo "9. GitHub connection"
-if gcloud builds triggers list --project="$PROJECT_ID" --format="value(name)" 2>/dev/null | grep -q deploy-kp3p; then
-  ok "GitHub triggers present"
+if gcloud builds connections describe github-kp3p --region="$REGION" --project="$PROJECT_ID" \
+  --format="value(installationState.stage)" 2>/dev/null | grep -qi complete; then
+  ok "GitHub connection github-kp3p complete"
 else
-  note "Connect https://github.com/gopi-mygastroai/KP3P in Cloud Build -> Repositories (2nd gen) or classic GitHub app"
+  note "Run ./infra/connect-github-triggers.sh to enable auto-deploy on git push"
 fi
 
 echo ""
