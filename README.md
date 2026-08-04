@@ -117,12 +117,52 @@ From `admin/`:
 
 See [`admin/package.json`](admin/package.json) for additional script entries (OpenRouter / legacy test utilities).
 
+## Environments
+
+| Environment | GCP project | Project number | Deploys from | Public URLs |
+|-------------|-------------|----------------|--------------|-------------|
+| Development | `kp3p-dev` | `1098378117483` | `dev` branch | `run.app` URLs only |
+| Production | `kp3p-prod` | `683351603210` | `main` branch | `www.gastroai.in`, `intake.gastroai.in` |
+| Legacy | `kp3p-admin-prod` | `452734733972` | — | none (retained as rollback, pending decommission) |
+
+### Promotion workflow
+
+1. Developers branch from `dev` and open a pull request back into `dev`.
+2. Merging to `dev` auto-deploys to `kp3p-dev`. Developers validate against the `run.app` URLs.
+3. When a change is ready for production, open a pull request from `dev` into `main`.
+4. The project owner reviews and merges. Merging to `main` auto-deploys to `kp3p-prod`.
+
+Developers have access to `kp3p-dev` only. Production deploys are gated by the `main` branch merge,
+which only the owner performs — nobody other than the owner holds IAM on `kp3p-prod`.
+
+### Data isolation (important)
+
+**`kp3p-dev` must never point at the production Supabase project or database.** It needs its own
+Supabase instance seeded with synthetic records; use [`admin/scripts/sampleKP3PPatient.ts`](admin/scripts/sampleKP3PPatient.ts)
+to generate test patients.
+
+Note that [`infra/setup-kp3p-prod.sh`](infra/setup-kp3p-prod.sh) contains a `copy_secret_from_old`
+helper that copies `SUPABASE_*` and `POSTGRES_*` secrets between projects. **Do not reuse it to seed
+`kp3p-dev`** — it would give every developer a live connection to real patient records. Seed dev
+secrets from a separate `admin/.env.dev` file instead.
+
+### Organization policy
+
+The `mygastro.ai` organization enforces Domain Restricted Sharing
+(`constraints/iam.allowedPolicyMemberDomains`). Both `kp3p-dev` and `kp3p-prod` carry a project-level
+exception (`allValues: ALLOW`), which is required so Cloud Run services can grant `allUsers` the
+invoker role and be publicly reachable. Without it, services return **403** even when deployed
+successfully — see [`infra/ORG-POLICY-403-FIX.md`](infra/ORG-POLICY-403-FIX.md).
+
+A side effect of the exception is that members outside the Workspace domain *can* be added to those
+two projects, so review IAM additions there deliberately.
+
 ## Deployment
 
 ### Admin app — Google Cloud Run
 
 - Hosted on Google Cloud Run (project: `kp3p-prod`, region: `asia-south1`)
-- Production URL: custom domain [https://www.gastroai.in](https://www.gastroai.in) (via Cloudflare proxy)
+- Production URL: [https://www.gastroai.in](https://www.gastroai.in) — served via a Cloudflare Worker, see [Domain and DNS](#domain-and-dns)
 - Docker image: `asia-south1-docker.pkg.dev/kp3p-prod/kp3p-repo/kp3p-admin`
 - Auto-deploys on push to `main` when files under `admin/` change (config: [`admin/cloudbuild.yaml`](admin/cloudbuild.yaml))
 - One-time setup and migration from `kp3p-admin-prod`: [`infra/setup-kp3p-prod.sh`](infra/setup-kp3p-prod.sh)
@@ -141,7 +181,7 @@ gcloud builds submit --config=cloudbuild.yaml .. \
 ### Patient intake app — Google Cloud Run
 
 - Hosted on Google Cloud Run (project: `kp3p-prod`, region: `asia-south1`)
-- Suggested custom domain: `https://intake.gastroai.in` (configure in Cloudflare)
+- Production URL: `https://intake.gastroai.in` — served via the same Cloudflare Worker, see [Domain and DNS](#domain-and-dns)
 - Docker image: `asia-south1-docker.pkg.dev/kp3p-prod/kp3p-repo/kp3p-intake`
 - Auto-deploys on push to `main` when files under `Patient-intake-form/` change (config: [`Patient-intake-form/cloudbuild.yaml`](Patient-intake-form/cloudbuild.yaml))
 
@@ -151,12 +191,47 @@ gcloud builds submit --config=cloudbuild.yaml .. \
 
 ## Infrastructure
 
-- **Google Cloud Project:** `kp3p-prod` (migrated from `kp3p-admin-prod`)
+- **Google Cloud Projects:** `kp3p-prod` (production, migrated from `kp3p-admin-prod`) and `kp3p-dev` (development) — see [Environments](#environments)
 - **Region:** `asia-south1` (Mumbai)
 - **Services used:** Cloud Run, Artifact Registry, Cloud Build, Secret Manager
-- **Domain:** `gastroai.in` managed via Cloudflare (proxied) → Cloud Run
-- **SSL:** Cloudflare (Full mode)
 - **CI/CD:** Cloud Build triggers on push to `main` → builds Docker image → deploys to Cloud Run
+
+### Domain and DNS
+
+`gastroai.in` is **registered at GoDaddy**, but its nameservers delegate to **Cloudflare**
+(`damon.ns.cloudflare.com`, `harlee.ns.cloudflare.com`). DNS records are edited in the Cloudflare
+dashboard — records added in GoDaddy's DNS panel have no effect.
+
+Traffic reaches Cloud Run through a **Cloudflare Worker** that rewrites the request hostname to the
+service's `run.app` URL:
+
+```
+Browser → Cloudflare (proxied) → Worker (host rewrite) → Cloud Run service
+```
+
+The Worker is required because Cloud Run routes by `Host` header, and neither alternative is
+available here: Cloud Run [domain mapping](https://cloud.google.com/run/docs/mapping-custom-domains)
+is not offered in `asia-south1`, and Cloudflare's Host-header override (Origin Rules / Page Rules)
+is Enterprise-only. A global external Application Load Balancer would also work, at the cost of a
+static IP and forwarding rule.
+
+| Hostname | Cloud Run service |
+|----------|-------------------|
+| `www.gastroai.in`, `gastroai.in` | `kp3p-admin` |
+| `intake.gastroai.in` | `kp3p-intake` |
+
+**Repointing a hostname to a different service is a Worker code change, not a DNS change.** Update
+the hostname map in the Worker and redeploy; DNS records stay untouched, so rollback is a Worker
+version revert.
+
+Required Cloudflare settings:
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| SSL/TLS mode | **Full** | Do not switch to Full (strict) without testing — the Worker's host rewrite can leave the SNI as `gastroai.in`, which Google's certificate will not match, taking the site down. |
+| Always Use HTTPS | **On** | Without it, a plain `http://` request reaches Cloud Run, which redirects to its own `run.app` URL — dropping users off the custom domain and scoping session cookies to `run.app`. |
+
+The Worker also forces `url.protocol = 'https:'` as a second line of defence against that redirect leak.
 
 ## Tech stack
 

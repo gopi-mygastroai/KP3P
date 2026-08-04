@@ -203,8 +203,16 @@ gcloud run jobs execute migrate-db --region asia-south1 --wait
 
 ### Production URLs
 
-- Admin custom domain: [https://www.gastroai.in](https://www.gastroai.in)
-- Intake (suggested): `https://intake.gastroai.in` — set `NEXT_PUBLIC_INTAKE_APP_URL` / Cloud Build substitution `_INTAKE_PUBLIC_URL` to match
+- Admin: [https://www.gastroai.in](https://www.gastroai.in)
+- Intake: `https://intake.gastroai.in` — set `NEXT_PUBLIC_INTAKE_APP_URL` / Cloud Build substitution `_INTAKE_PUBLIC_URL` to match
+
+Both hostnames are served by a Cloudflare Worker that rewrites the request host to the service's
+`run.app` URL; see [Domain and DNS](../README.md#domain-and-dns) in the root README. Pointing a
+hostname at a different Cloud Run service means editing the Worker, not DNS.
+
+`NEXT_PUBLIC_INTAKE_APP_URL` is baked into the image at **Docker build time** (see `Dockerfile`) and
+drives the "Patient Intake Form" button in `src/app/AuthForm.tsx`. Changing the intake hostname
+requires a rebuild, not just a Cloud Run environment update.
 
 ## Docker
 

@@ -48,6 +48,9 @@ Deploy as a Cloud Run service in project **`kp3p-prod`** (region `asia-south1`).
 |---------------------|------------------|
 | `NEXT_PUBLIC_API_URL` | `https://www.gastroai.in` |
 
+Served publicly at `https://intake.gastroai.in` via a Cloudflare Worker that rewrites the request
+host to this service's `run.app` URL; see [Domain and DNS](../README.md#domain-and-dns).
+
 One-time setup (both apps): from repo root run [`../infra/setup-kp3p-prod.sh`](../infra/setup-kp3p-prod.sh).
 
 Manual deploy from repo root:
